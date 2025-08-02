@@ -57,7 +57,9 @@ module.exports = {
         // Get the options provided by the user
         const targetChannel = interaction.options.getChannel('channel');
         const announcementTitle = interaction.options.getString('title');
-        const announcementMessage = interaction.options.getString('message');
+        // Fix for Discord's slash command input not recognizing `\n` as a newline.
+        // We replace all instances of the literal `\n` with a proper newline character.
+        const announcementMessage = interaction.options.getString('message').replace(/\\n/g, '\n');
         const announcementImage = interaction.options.getString('image');
         const announcementThumbnail = interaction.options.getString('thumbnail');
         const announcementColor = interaction.options.getString('color');
