@@ -1,9 +1,7 @@
 // src/commands/shorten.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- ADD THIS LINE
-const axios = require('axios'); // Make sure you have 'axios' installed: npm install axios
-const { URL } = require('url'); // Node.js URL class for validation
-
+const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- THIS LINE IS CRUCIAL
+const axios = require('axios');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -27,7 +25,7 @@ module.exports = {
         const shortenerDomain = process.env.SHORTENER_DOMAIN; // This should be 'mlvs.me'
 
         if (!rebrandlyApiKey || !shortenerDomain) {
-            const errorEmbed = getThemedEmbed()
+            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
                 .setDescription('❌ URL Shortener API key or domain not configured. Please set `REBRANDLY_API_KEY` and `SHORTENER_DOMAIN` in `.env`.')
                 .setColor('#FF0000');
             return interaction.editReply({ embeds: [errorEmbed] });
@@ -37,7 +35,7 @@ module.exports = {
         try {
             new URL(longUrl); // Throws if URL is invalid
         } catch (e) {
-            const errorEmbed = getThemedEmbed()
+            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
                 .setDescription('❌ Invalid URL provided. Please provide a valid link starting with `http://` or `https://`.')
                 .setColor('#FF0000');
             return interaction.editReply({ embeds: [errorEmbed] });
@@ -81,7 +79,7 @@ module.exports = {
                     errorMessage = `❌ The custom short code \`${customCode}\` is already in use or unavailable. Please try another one.`;
                 }
             }
-            const errorEmbed = getThemedEmbed()
+            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
                 .setDescription(`❌ ${errorMessage}`)
                 .setColor('#FF0000');
             await interaction.editReply({ embeds: [errorEmbed] });

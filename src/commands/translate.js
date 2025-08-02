@@ -1,11 +1,9 @@
 // src/commands/translate.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- ADD THIS LINE
+const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- THIS LINE IS CRUCIAL
 const axios = require('axios');
-const { URL } = require('url'); // Node.js URL class for validation
 
 // List of supported languages for autocomplete (adjust as needed based on API)
-// This is a simplified list. A real API might have different codes or a longer list.
 const supportedLanguages = [
     { name: 'English', value: 'en' },
     { name: 'Spanish', value: 'es' },
@@ -70,7 +68,7 @@ module.exports = {
         const apiUrl = process.env.TRANSLATION_API_URL;
 
         if (!apiUrl) {
-            const errorEmbed = getThemedEmbed()
+            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
                 .setDescription('❌ Translation API URL not configured. Please set `TRANSLATION_API_URL` in `.env`.')
                 .setColor('#FF0000');
             return interaction.editReply({ embeds: [errorEmbed] });
@@ -98,13 +96,13 @@ module.exports = {
                 source: fromLang,
                 target: toLang,
                 format: 'text',
-                api_key: '' // LibreTranslate often doesn't require a key by default for public instances
+                api_key: ''
             }, {
                 headers: { 'Content-Type': 'application/json' }
             });
 
             const translatedText = response.data.translatedText;
-            const detectedSource = response.data.detectedLanguage?.language || fromLang; // Get detected language if available
+            const detectedSource = response.data.detectedLanguage?.language || fromLang;
 
             const embed = getThemedEmbed()
                 .setTitle('🌍 Text Translated!')
@@ -117,7 +115,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error translating text:', error.response ? error.response.data : error.message);
-            const errorEmbed = getThemedEmbed()
+            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
                 .setDescription('❌ Failed to translate text. The translation API might be unavailable or rate-limited.')
                 .setColor('#FF0000');
             await interaction.editReply({ embeds: [errorEmbed] });
