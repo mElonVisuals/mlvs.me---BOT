@@ -40,14 +40,18 @@ module.exports = {
         .addStringOption(option =>
             option.setName('footer-text')
                 .setDescription('A short line of text for the footer.')
+                .setRequired(false))
+        .addBooleanOption(option =>
+            option.setName('ping-everyone')
+                .setDescription('Choose whether to ping @everyone with the announcement.')
                 .setRequired(false)),
 
     // Command execution logic
     async execute(interaction) {
-        // Instantiate CustomEmbedBuilder just like in your serverinfo.js
+        // Instantiate CustomEmbedBuilder
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
         
-        // Defer the reply, making it ephemeral (only visible to the user who ran the command)
+        // Defer the reply, making it ephemeral
         await interaction.deferReply({ ephemeral: true });
 
         // Get the options provided by the user
@@ -58,9 +62,10 @@ module.exports = {
         const announcementThumbnail = interaction.options.getString('thumbnail');
         const announcementColor = interaction.options.getString('color');
         const announcementFooterText = interaction.options.getString('footer-text');
+        const pingEveryone = interaction.options.getBoolean('ping-everyone');
 
         try {
-            // Check if the bot has permission to send messages to the target channel
+            // Check bot permissions to send messages
             const channelPermissions = interaction.guild.members.me.permissionsIn(targetChannel);
             if (!channelPermissions.has(PermissionsBitField.Flags.SendMessages)) {
                 const errorEmbed = embedBuilder.error(
@@ -70,11 +75,14 @@ module.exports = {
                 return interaction.editReply({ embeds: [errorEmbed] });
             }
 
-            // Create the embed using the provided options
-            // Use the star emoji in the title for visual flair
+            // Build the core embed
             const announcementEmbed = embedBuilder.createBaseEmbed('info')
-                .setTitle(`${THEME.emojis.star} ${announcementTitle}`)
-                .setDescription(announcementMessage);
+                .setTitle(announcementTitle)
+                .setDescription(announcementMessage)
+                .setAuthor({
+                    name: `Announcement by ${interaction.user.username}`,
+                    iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+                });
 
             // Set the image if one was provided
             if (announcementImage) {
@@ -87,7 +95,7 @@ module.exports = {
             }
 
             // Set the color if one was provided and it's a valid hex code
-            // Otherwise, use a default gold color for announcements.
+            // Otherwise, use a default color for announcements.
             if (announcementColor && /^#[0-9A-Fa-f]{6}$/.test(announcementColor)) {
                 announcementEmbed.setColor(announcementColor);
             } else {
@@ -95,15 +103,13 @@ module.exports = {
             }
 
             // Set the footer with optional text, an emoji, and a timestamp
-            if (announcementFooterText) {
-                announcementEmbed.setFooter({ text: `${THEME.emojis.pin} ${announcementFooterText}` });
-            } else {
-                 announcementEmbed.setFooter({ text: `${THEME.emojis.pin} Sent by the bot team` });
-            }
+            const footerText = announcementFooterText || 'Sent by the bot team';
+            announcementEmbed.setFooter({ text: `${THEME.emojis.pin} ${footerText}` });
             announcementEmbed.setTimestamp();
 
-            // Send the embed to the chosen channel
-            await targetChannel.send({ embeds: [announcementEmbed] });
+            // Send the embed with an optional ping
+            const content = pingEveryone ? '@everyone' : null;
+            await targetChannel.send({ content, embeds: [announcementEmbed] });
 
             // Send a success message back to the user
             const successEmbed = embedBuilder.success(
