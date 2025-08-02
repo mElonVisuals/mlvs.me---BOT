@@ -1,6 +1,6 @@
 // src/commands/translate.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- THIS LINE IS CRUCIAL
+const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder'); // <--- IMPORT THE CLASS AND THEME
 const axios = require('axios');
 
 // List of supported languages for autocomplete (adjust as needed based on API)
@@ -52,25 +52,32 @@ module.exports = {
             lang.name.toLowerCase().includes(focusedValue.toLowerCase()) ||
             lang.value.toLowerCase().includes(focusedValue.toLowerCase())
         );
-        const filtered = choices.slice(0, 25); // Discord only allows 25 options
+        const filtered = choices.slice(0, 25);
         await interaction.respond(
             filtered.map(choice => ({ name: choice.name, value: choice.value }))
         );
     },
 
     async execute(interaction) {
-        await interaction.deferReply(); // Defer the reply as API calls can take time
+        // --- NEW CODE START ---
+        // Create a new instance of CustomEmbedBuilder for this interaction
+        const embedBuilder = new CustomEmbedBuilder(interaction.client);
+        // --- NEW CODE END ---
+
+        await interaction.deferReply();
 
         const text = interaction.options.getString('text');
         const toLang = interaction.options.getString('to').toLowerCase();
-        const fromLang = interaction.options.getString('from')?.toLowerCase() || 'auto'; // 'auto' for auto-detection
+        const fromLang = interaction.options.getString('from')?.toLowerCase() || 'auto';
 
         const apiUrl = process.env.TRANSLATION_API_URL;
 
         if (!apiUrl) {
-            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
-                .setDescription('❌ Translation API URL not configured. Please set `TRANSLATION_API_URL` in `.env`.')
-                .setColor('#FF0000');
+            // Use the instance's error method
+            const errorEmbed = embedBuilder.error(
+                'Configuration Error',
+                'Translation API URL not configured. Please set `TRANSLATION_API_URL` in `.env`.'
+            );
             return interaction.editReply({ embeds: [errorEmbed] });
         }
 
@@ -78,15 +85,19 @@ module.exports = {
         const validFromLang = fromLang === 'auto' || supportedLanguages.some(lang => lang.value === fromLang);
 
         if (!validToLang) {
-            const errorEmbed = getThemedEmbed()
-                .setDescription(`❌ Invalid target language code: \`${toLang}\`. Please use a valid language code (e.g., \`en\`, \`es\`).`)
-                .setColor('#FF0000');
+            // Use the instance's error method
+            const errorEmbed = embedBuilder.error(
+                'Invalid Language',
+                `Invalid target language code: \`${toLang}\`. Please use a valid language code (e.g., \`en\`, \`es\`).`
+            );
             return interaction.editReply({ embeds: [errorEmbed] });
         }
         if (!validFromLang) {
-            const errorEmbed = getThemedEmbed()
-                .setDescription(`❌ Invalid source language code: \`${fromLang}\`. Please use a valid language code or 'auto'.`)
-                .setColor('#FF0000');
+            // Use the instance's error method
+            const errorEmbed = embedBuilder.error(
+                'Invalid Language',
+                `Invalid source language code: \`${fromLang}\`. Please use a valid language code or 'auto'.`
+            );
             return interaction.editReply({ embeds: [errorEmbed] });
         }
 
@@ -104,8 +115,9 @@ module.exports = {
             const translatedText = response.data.translatedText;
             const detectedSource = response.data.detectedLanguage?.language || fromLang;
 
-            const embed = getThemedEmbed()
-                .setTitle('🌍 Text Translated!')
+            // Use the instance's createBaseEmbed method and customize
+            const embed = embedBuilder.createBaseEmbed('info') // Use 'info' for info type
+                .setTitle(`${THEME.emojis.info} Text Translated!`) // Incorporate info emoji from THEME
                 .addFields(
                     { name: `Original (${detectedSource})`, value: `\`\`\`${text}\`\`\`` },
                     { name: `Translated (${toLang})`, value: `\`\`\`${translatedText}\`\`\`` }
@@ -115,9 +127,11 @@ module.exports = {
 
         } catch (error) {
             console.error('Error translating text:', error.response ? error.response.data : error.message);
-            const errorEmbed = getThemedEmbed() // <--- This is the line that's failing if not imported
-                .setDescription('❌ Failed to translate text. The translation API might be unavailable or rate-limited.')
-                .setColor('#FF0000');
+            // Use the instance's error method
+            const errorEmbed = embedBuilder.error(
+                'Translation Failed',
+                'Failed to translate text. The translation API might be unavailable or rate-limited.'
+            );
             await interaction.editReply({ embeds: [errorEmbed] });
         }
     },
