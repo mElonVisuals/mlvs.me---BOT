@@ -1,7 +1,9 @@
 // src/commands/shorten.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getThemedEmbed } = require('../utils/embedBuilder');
+const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- ADD THIS LINE
 const axios = require('axios'); // Make sure you have 'axios' installed: npm install axios
+const { URL } = require('url'); // Node.js URL class for validation
+
 
 module.exports = {
     data: new SlashCommandBuilder()

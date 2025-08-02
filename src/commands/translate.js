@@ -1,7 +1,8 @@
 // src/commands/translate.js
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getThemedEmbed } = require('../utils/embedBuilder');
-const axios = require('axios'); // Make sure you have 'axios' installed: npm install axios
+const { getThemedEmbed } = require('../utils/embedBuilder'); // <--- ADD THIS LINE
+const axios = require('axios');
+const { URL } = require('url'); // Node.js URL class for validation
 
 // List of supported languages for autocomplete (adjust as needed based on API)
 // This is a simplified list. A real API might have different codes or a longer list.
