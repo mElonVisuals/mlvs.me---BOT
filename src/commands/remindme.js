@@ -1,6 +1,6 @@
 // src/commands/remindme.js
 const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder'); // Import the class and THEME
+const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder'); // Use your existing import structure
 const ms = require('ms'); // You'll need to install this package: npm install ms
 
 module.exports = {
@@ -16,7 +16,7 @@ module.exports = {
                 .setDescription('What do you want to be reminded about?')
                 .setRequired(true)),
     async execute(interaction) {
-        // Create an instance of CustomEmbedBuilder for this interaction
+        // Instantiate CustomEmbedBuilder just like in serverinfo.js
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
 
         await interaction.deferReply({ ephemeral: true }); // Defer and make it ephemeral
@@ -30,7 +30,7 @@ module.exports = {
 
         if (!timeInMs || timeInMs < 5000) { // Minimum 5 seconds
             const errorEmbed = embedBuilder.error(
-                'Invalid Time',
+                'Invalid Time Provided',
                 'Please provide a valid time (e.g., `10s`, `5m`, `1h`, `3d`). Minimum reminder time is 5 seconds.'
             );
             return interaction.editReply({ embeds: [errorEmbed] });
@@ -46,12 +46,12 @@ module.exports = {
 
         const reminderTimestamp = Math.floor((Date.now() + timeInMs) / 1000); // Unix timestamp for Discord formatting
 
-        const successEmbed = embedBuilder.createBaseEmbed('success')
-            .setTitle(`${THEME.emojis.success} Reminder Set!`)
-            .setDescription(`I will remind you <t:${reminderTimestamp}:R> in this channel.`)
-            .addFields(
-                { name: 'Your Reminder', value: `\`\`\`${reminderMessage}\`\`\`` }
-            );
+        const successEmbed = embedBuilder.success( // Using success embed type
+            'Reminder Set!',
+            `I will remind you <t:${reminderTimestamp}:R> in this channel.`
+        ).addFields(
+            { name: 'Your Reminder', value: `\`\`\`${reminderMessage}\`\`\`` }
+        );
 
         await interaction.editReply({ embeds: [successEmbed] });
 
@@ -63,13 +63,12 @@ module.exports = {
                 const channel = await interaction.client.channels.fetch(channelId);
 
                 if (user && channel) {
-                    const reminderEmbed = embedBuilder.createBaseEmbed('info')
-                        .setTitle(`${THEME.emojis.info} Reminder!`)
-                        .setDescription(`Hey ${user}! You asked me to remind you about:`)
-                        .addFields(
-                            { name: 'Your Message', value: `\`\`\`${reminderMessage}\`\`\`` }
-                        )
-                        .setTimestamp(); // Set timestamp to when the reminder fires
+                    const reminderEmbed = embedBuilder.info( // Using info embed type
+                        'Reminder!',
+                        `Hey ${user}! You asked me to remind you about:`
+                    ).addFields(
+                        { name: 'Your Message', value: `\`\`\`${reminderMessage}\`\`\`` }
+                    );
 
                     // Send the reminder message to the original channel
                     await channel.send({ content: `<@${userId}>`, embeds: [reminderEmbed] });
