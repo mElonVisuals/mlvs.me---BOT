@@ -28,14 +28,14 @@ module.exports = {
         });
 
         // Deploy commands on startup (in development)
-        if (process.env.NODE_ENV === 'development') {
-            console.log('🔄 Deploying commands in development mode...');
-            try {
-                await deployCommands();
-                console.log('✅ Commands deployed successfully!');
-            } catch (error) {
-                console.error('❌ Failed to deploy commands:', error);
-            }
+        if (process.env.NODE_ENV === 'production') {
+            console.log('Deploying global commands in production...');
+            await deployCommands(client.application.id); // Deploy globally for production
+            console.log('Global commands deployed.');
+        } else {
+            console.log(`Deploying commands to development guild (${process.env.GUILD_ID})...`);
+            await deployCommands(client.application.id, process.env.GUILD_ID); // Deploy to test guild
+            console.log('Development guild commands deployed.');
         }
 
         console.log('🎉 Bot is fully operational!');
