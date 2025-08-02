@@ -77,7 +77,7 @@ module.exports = {
 
             // Build the core embed
             const announcementEmbed = embedBuilder.createBaseEmbed('info')
-                .setTitle(announcementTitle)
+                .setTitle(`✨ ${announcementTitle}`) // Use a thematic emoji for visual pop
                 .setDescription(announcementMessage)
                 .setAuthor({
                     name: `Announcement by ${interaction.user.username}`,
@@ -95,16 +95,17 @@ module.exports = {
             }
 
             // Set the color if one was provided and it's a valid hex code
-            // Otherwise, use a default color for announcements.
+            // Otherwise, use a default gold color for announcements.
             if (announcementColor && /^#[0-9A-Fa-f]{6}$/.test(announcementColor)) {
                 announcementEmbed.setColor(announcementColor);
             } else {
                 announcementEmbed.setColor('#FFD700'); // Gold
             }
 
-            // Set the footer with optional text, an emoji, and a timestamp
-            const footerText = announcementFooterText || 'Sent by the bot team';
-            announcementEmbed.setFooter({ text: `${THEME.emojis.pin} ${footerText}` });
+            // Set the footer with optional text and a timestamp
+            // The logic now correctly prevents "undefined" from appearing.
+            const footerText = announcementFooterText ? `📌 ${announcementFooterText}` : `📌 Sent by the bot team`;
+            announcementEmbed.setFooter({ text: footerText });
             announcementEmbed.setTimestamp();
 
             // Send the embed with an optional ping
