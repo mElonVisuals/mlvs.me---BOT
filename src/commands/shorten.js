@@ -79,21 +79,30 @@ module.exports = {
 
             await interaction.editReply({ embeds: [embed] });
 
-        } catch (error) {
-            console.error('Error shortening URL:', error.response ? error.response.data : error.message);
-            let errorMessage = 'Failed to shorten URL. The API might be unavailable or you might have exceeded limits.';
-            if (error.response && error.response.data && error.response.data.message) {
-                errorMessage = `Failed to shorten URL: ${error.response.data.message}`;
-                if (error.response.data.code === 'LinkConflict' && customCode) {
-                    errorMessage = `❌ The custom short code \`${customCode}\` is already in use or unavailable. Please try another one.`;
-                }
+} catch (error) {
+    console.error('Error shortening URL:', error.response ? JSON.stringify(error.response.data, null, 2) : error.message); // Log full error data
+    let errorMessage = 'Failed to shorten URL. The API might be unavailable or you might have exceeded limits.';
+
+    if (error.response) {
+        // Check for specific Rebrandly error codes/messages
+        if (error.response.data && error.response.data.message) {
+            errorMessage = `Rebrandly API Error: ${error.response.data.message}`;
+            if (error.response.data.code === 'LinkConflict' && customCode) {
+                errorMessage = `❌ The custom short code \`${customCode}\` is already in use or unavailable. Please try another one.`;
             }
-            // Use the instance's error method
-            const errorEmbed = embedBuilder.error(
-                'Shortening Failed',
-                errorMessage
-            );
-            await interaction.editReply({ embeds: [errorEmbed] });
+        } else if (error.response.status) {
+            errorMessage = `Rebrandly API returned status ${error.response.status}. Please check your API key and domain.`;
         }
+    }
+
+    const errorEmbed = embedBuilder.error(
+        'Shortening Failed',
+        errorMessage
+    );
+    await interaction.editReply({ embeds: [errorEmbed] });
+}
+
+            
+
     },
 };
