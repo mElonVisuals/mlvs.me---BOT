@@ -1,32 +1,33 @@
-{
-  "name": "mlvs.me",
-  "version": "1.0.0",
-  "description": "A beautifully crafted Discord bot with scalable architecture",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "deploy": "node src/utils/deploy-commands.js",
-    "docker:build": "docker build -t mlvs-me-bot .",
-    "docker:run": "docker run -d --name mlvs-bot --env-file .env mlvs-me-bot",
-    "docker:stop": "docker stop mlvs-bot && docker rm mlvs-bot"
-  },
-  "keywords": [
-    "discord",
-    "bot",
-    "discord.js",
-    "mlvs.me"
-  ],
-  "author": "mlvs.me",
-  "license": "MIT",
-  "dependencies": {
-    "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.4"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
+# Use the official Node.js 18 LTS image
+FROM node:18-alpine
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy package files first for better Docker layer caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy the rest of the application code
+COPY . .
+
+# Create a non-root user to run the application
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S mlvsbot -u 1001
+
+# Change ownership of the app directory to the nodejs user
+RUN chown -R mlvsbot:nodejs /app
+USER mlvsbot
+
+# Expose the port (even though Discord bots don't typically use HTTP)
+# This is useful if you add a health check endpoint later
+EXPOSE 3000
+
+# Health check to ensure the bot is running properly
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "console.log('Bot health check passed')" || exit 1
+
+# Start the bot
+CMD ["npm", "start"]
