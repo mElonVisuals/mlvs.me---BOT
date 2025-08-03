@@ -1,6 +1,6 @@
 /**
  * Message Create Event Handler
- * Handles AFK mentions and return detection using a MySQL database.
+ * Handles AFK mentions and return detection
  */
 
 const { Events } = require('discord.js');
@@ -15,14 +15,14 @@ module.exports = {
         const afkCommand = require('../commands/afk');
 
         // Check if the message author returned from AFK
-        await afkCommand.checkReturn(message);
+        afkCommand.checkReturn(message);
 
         // Check for mentions of AFK users
         if (message.mentions.users.size > 0) {
-            message.mentions.users.forEach(async user => {
+            message.mentions.users.forEach(user => {
                 // Don't notify about self-mentions
                 if (user.id !== message.author.id) {
-                    await afkCommand.handleMention(message, user);
+                    afkCommand.handleMention(message, user);
                 }
             });
         }

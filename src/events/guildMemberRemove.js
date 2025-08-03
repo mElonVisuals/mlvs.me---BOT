@@ -1,47 +1,40 @@
 /**
  * Guild Member Remove Event Handler
- * Sends a goodbye message when a member leaves the server.
+ * Fires when a user leaves the server, sending a goodbye message.
  */
 
 const { Events } = require('discord.js');
 const { CustomEmbedBuilder } = require('../utils/embedBuilder');
-const { getGuildSetting } = require('../utils/database'); // New utility to handle database queries
 
 module.exports = {
+    // The event name is GuildMemberRemove, which triggers when a user leaves.
     name: Events.GuildMemberRemove,
     once: false,
     async execute(member) {
         const embedBuilder = new CustomEmbedBuilder(member.client);
 
+        // --- Configuration ---
+        const welcomeChannelId = '1401618792798224434';
+        const goodbyeChannel = member.guild.channels.cache.get(welcomeChannelId);
+
+        // If the channel isn't found, log an error and stop.
+        if (!goodbyeChannel) {
+            console.error(`❌ Channel with ID ${welcomeChannelId} not found for goodbye message.`);
+            return;
+        }
+
+        // Build the goodbye embed using the custom embed builder.
+        const goodbyeEmbed = embedBuilder.info(
+            `Goodbye, ${member.user.username}!`,
+            `We're sad to see you go. The server now has ${member.guild.memberCount} members.`
+        )
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }));
+
         try {
-            // Get the welcome channel and goodbye message from the database
-            const welcomeChannelId = await getGuildSetting(member.guild.id, 'welcomeChannelId');
-            const goodbyeMessageTemplate = await getGuildSetting(member.guild.id, 'goodbyeMessage');
-            
-            // If no goodbye channel or message is configured, do nothing
-            if (!welcomeChannelId || !goodbyeMessageTemplate) return;
-
-            const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
-            
-            if (!welcomeChannel) {
-                console.warn(`⚠️ Goodbye channel not found for guild ${member.guild.id}.`);
-                return;
-            }
-
-            // Replace placeholders in the message
-            const goodbyeMessage = goodbyeMessageTemplate
-                .replace(/{user}/g, member.user.tag)
-                .replace(/{server}/g, member.guild.name);
-
-            const goodbyeEmbed = embedBuilder.info(
-                `Goodbye, ${member.user.tag}!`,
-                goodbyeMessage
-            ).setThumbnail(member.user.displayAvatarURL());
-
-            await welcomeChannel.send({ embeds: [goodbyeEmbed] });
-
+            // Send the goodbye embed to the designated channel.
+            await goodbyeChannel.send({ embeds: [goodbyeEmbed] });
         } catch (error) {
-            console.error(`❌ Error handling member remove event for guild ${member.guild.id}:`, error);
+            console.error(`❌ Error sending goodbye message: ${error.message}`);
         }
     },
 };
