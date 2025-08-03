@@ -1,52 +1,37 @@
-{javascript}
 /**
  * Database Connection Utility
- * Handles connecting to MongoDB using Mongoose.
+ * Connects to a MongoDB database using the connection string from the .env file.
  */
 
-const mongoose = require('mongoose');
+// Import the MongoClient from the mongodb library
+const { MongoClient } = require('mongodb');
 
-// The main function to establish the database connection
-async function connectDatabase() {
-    // Check if the MONGO_URL environment variable is set
-    if (!process.env.MONGO_URL) {
-        console.error('❌ MONGO_URL is not set in the .env file. Database connection aborted.');
-        // Don't exit the process so the bot can still run without a database
-        return;
-    }
+// Get the MONGO_URL from the environment variables
+const { MONGO_URL } = process.env;
 
+// Create a new MongoClient
+const client = new MongoClient(MONGO_URL);
+
+/**
+ * Connects to the MongoDB database.
+ * @returns {Promise<MongoClient>} The connected MongoClient instance.
+ */
+async function connectToDatabase() {
     try {
-        console.log('🔗 Attempting to connect to the database...');
-        
-        // Connect to MongoDB
-        await mongoose.connect(process.env.MONGO_URL, {
-            // These options are recommended by Mongoose to ensure a stable connection
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-            serverSelectionTimeoutMS: 5000, // Timeout after 5s
-        });
-
-        console.log('✅ Successfully connected to the database!');
-
-        // Optional: Log connection events
-        mongoose.connection.on('error', err => {
-            console.error('⚠️  Mongoose connection error:', err);
-        });
-
-        mongoose.connection.on('disconnected', () => {
-            console.log('⛔ Mongoose has disconnected from the database.');
-        });
-
+        // Attempt to connect to the database
+        console.log('🔗 Attempting to connect to MongoDB...');
+        await client.connect();
+        console.log('✅ Successfully connected to MongoDB!');
+        return client;
     } catch (error) {
-        console.error('❌ Failed to connect to the database:', error.message);
-        console.error('Stack trace:', error.stack);
+        console.error('❌ Failed to connect to MongoDB:', error);
+        // Rethrow the error to stop the bot from starting if the connection fails
+        throw error;
     }
 }
 
-// Function to get the current connection status
-function getConnectionStatus() {
-    return mongoose.connection.readyState;
-}
-
-// Export the functions for use in other files
-module.exports = { connectDatabase, getConnectionStatus };
+// Export the client and the connection function
+module.exports = {
+    client,
+    connectToDatabase,
+};
