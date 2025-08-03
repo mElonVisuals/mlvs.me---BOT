@@ -1,131 +1,53 @@
 /**
  * User Info Command
- * Displays detailed information about a Discord user
+ * Displays detailed information about a user.
  */
 
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const moment = require('moment'); // Make sure you have this library installed
 
 module.exports = {
-    // Add a category property for organization
     category: 'Information',
-
-    // Command data
+    
     data: new SlashCommandBuilder()
         .setName('userinfo')
-        .setDescription('Display detailed information about a user')
+        .setDescription('Displays information about a user or yourself')
         .addUserOption(option =>
             option
                 .setName('user')
-                .setDescription('The user to get information about')
-                .setRequired(false)
-        ),
+                .setDescription('The user to get info about (defaults to you)')
+                .setRequired(false)),
 
-    // Execute function
     async execute(interaction) {
-        // The reply is already deferred in the main interactionCreate event handler,
-        // so we can proceed with fetching data and building the embed.
-
-        // Get the target user from the command options, or the command author if no user is specified.
-        const targetUser = interaction.options.getUser('user') || interaction.user;
-        const targetMember = interaction.guild.members.cache.get(targetUser.id);
-
-        if (!targetMember) {
-            // If the user isn't in the guild (e.g. from another guild or has left)
-            const noMemberEmbed = new EmbedBuilder()
-                .setColor(0xF04747) // Red color for errors
-                .setDescription(`⚠️ User \`${targetUser.username}\` is not in this server.`);
-            
-            // Edit the deferred reply with an error message
-            return await interaction.editReply({ embeds: [noMemberEmbed] });
+        // Defer the reply immediately to prevent a timeout.
+        await interaction.deferReply();
+        
+        const user = interaction.options.getUser('user') || interaction.user;
+        const member = interaction.guild.members.cache.get(user.id);
+        
+        if (!member) {
+            await interaction.editReply({ content: 'I could not find that user in this server.', ephemeral: true });
+            return;
         }
 
-        // Fetch the full user to get their banner, which is not available on the base user object
-        let fullUser = targetUser;
-        try {
-            fullUser = await interaction.client.users.fetch(targetUser.id, { force: true, cache: false });
-        } catch (error) {
-            console.error('Could not fetch full user data:', error.message);
-        }
-
-        // Create the new embed
-        const userInfoEmbed = new EmbedBuilder()
-            // Set a consistent color for the embed
-            .setColor(0x5865F2) // Discord's blurple color
-            .setTitle(`User Info - ${fullUser.username}`)
-            // Use the target's server avatar for the thumbnail if they have one, otherwise use their global avatar
-            .setThumbnail(targetMember.displayAvatarURL({ dynamic: true, size: 1024 }) || fullUser.displayAvatarURL({ dynamic: true, size: 1024 }))
-            // Add a timestamp and footer
+        const infoEmbed = new EmbedBuilder()
+            .setColor(member.displayHexColor !== '#000000' ? member.displayHexColor : '#0099ff')
+            .setTitle(`User Info for ${user.username}`)
+            .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 1024 }))
+            .addFields(
+                { name: 'User Tag:', value: `\`${user.tag}\``, inline: true },
+                { name: 'User ID:', value: `\`${user.id}\``, inline: true },
+                { name: '\u200B', value: '\u200B', inline: true }, // Empty field for spacing
+                { name: 'Joined Discord:', value: moment(user.createdAt).format('LL'), inline: true },
+                { name: 'Joined Server:', value: moment(member.joinedAt).format('LL'), inline: true },
+                { name: '\u200B', value: '\u200B', inline: true }, // Empty field for spacing
+                { name: 'Roles:', value: member.roles.cache.size > 1 ? member.roles.cache.filter(r => r.id !== interaction.guild.id).map(r => r.toString()).join(', ') : 'None', inline: false },
+                { name: 'Highest Role:', value: member.roles.highest.toString(), inline: true },
+                { name: 'Is Bot:', value: user.bot ? 'Yes' : 'No', inline: true }
+            )
             .setTimestamp()
-            .setFooter({
-                text: `${interaction.guild.name}`,
-                iconURL: interaction.guild.iconURL()
-            });
+            .setFooter({ text: `Requested by ${interaction.user.tag}` });
 
-        // ====================================================================
-        //                       General Section
-        // ====================================================================
-        // Add fields for General Info
-        userInfoEmbed.addFields(
-            { name: '**__- General:__**', value: '\u200b', inline: false },
-            { name: 'Username:', value: `${fullUser.username}`, inline: true },
-            { name: 'ID:', value: `\`${fullUser.id}\``, inline: true }
-        );
-
-        // ====================================================================
-        //                       Server Stats Section
-        // ====================================================================
-        // Get the highest role the user has
-        const highestRole = targetMember.roles.highest.id === interaction.guild.id ? 'None' : targetMember.roles.highest.toString();
-        
-        userInfoEmbed.addFields(
-            { name: '\u200b', value: '\u200b', inline: false },
-            { name: '**__- Server Stats:__**', value: '\u200b', inline: false },
-            { name: 'Nickname:', value: `${targetMember.nickname || 'None'}`, inline: true },
-            { name: 'Joined Server:', value: `🗓️ <t:${Math.floor(targetMember.joinedAt.getTime() / 1000)}:R>`, inline: true },
-            { name: 'Highest Role:', value: `${highestRole}`, inline: true }
-        );
-
-        // ====================================================================
-        //                       Avatars Section
-        // ====================================================================
-        userInfoEmbed.addFields({
-            name: '\u200b', // Spacer for a new line
-            value: '\u200b',
-            inline: false
-        }, {
-            name: '🖼️ Avatars:',
-            value: `**Global Avatar:** [Link](${fullUser.displayAvatarURL({ dynamic: true, size: 1024 })})\n` +
-                    `**Server Avatar:** [Link](${targetMember.displayAvatarURL({ dynamic: true, size: 1024 }) || 'None'})`,
-            inline: false
-        });
-
-        // ====================================================================
-        //                       Roles Section
-        // ====================================================================
-        // Add roles if the user has any in this guild
-        if (targetMember.roles.cache.size > 1) {
-            const roles = targetMember.roles.cache
-                .filter(role => role.id !== interaction.guild.roles.everyone.id)
-                .sort((a, b) => b.position - a.position)
-                .map(role => role.toString());
-
-            userInfoEmbed.addFields({
-                name: '\u200b', // Spacer for a new line
-                value: '\u200b',
-                inline: false
-            }, {
-                name: `Roles [${roles.length}]`,
-                value: roles.join(', '),
-                inline: false
-            });
-        }
-        
-        // Add the user's banner as the image if it exists
-        if (fullUser.banner) {
-            userInfoEmbed.setImage(fullUser.bannerURL({ dynamic: true, size: 1024 }));
-        }
-
-        // Edit the deferred reply with the final embed
-        await interaction.editReply({ embeds: [userInfoEmbed] });
+        await interaction.editReply({ embeds: [infoEmbed] });
     },
 };

@@ -1,46 +1,44 @@
-// src/commands/botinfo.js
+/**
+ * Bot Info Command
+ * Displays detailed information about the bot, including latency.
+ */
 
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const moment = require('moment');
 
 module.exports = {
-    category: 'Utility',
+    category: 'Information',
+    
     data: new SlashCommandBuilder()
         .setName('botinfo')
-        .setDescription('Displays information about the bot and its stats.'),
+        .setDescription('Displays information about the bot'),
 
     async execute(interaction) {
-        const { client, guild } = interaction;
+        // Defer the reply immediately to prevent a timeout and to provide more time for processing.
+        await interaction.deferReply();
 
-        // Get the total number of users in the guild using the memberCount property
-        // This is more reliable than counting cached members
-        const memberCount = guild.memberCount;
-        
-        // Get the number of users in the guild
-        const userCount = guild.members.cache.filter(member => !member.user.bot).size;
-        
-        // Get the bot count
-        const botCount = guild.members.cache.filter(member => member.user.bot).size;
-        
-        // Calculate uptime
-        const uptime = moment.duration(client.uptime).humanize();
+        // Calculate the bot's latency and Discord API latency
+        const botLatency = Math.round(interaction.client.ws.ping);
+        const apiLatency = Date.now() - interaction.createdTimestamp;
 
-        const botInfoEmbed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle(`🤖 ${client.user.username} Bot Information`)
-            .setDescription('Here is some information about the bot:')
+        const infoEmbed = new EmbedBuilder()
+            .setColor(0x0099ff)
+            .setTitle(`Bot Information`)
+            .setThumbnail(interaction.client.user.displayAvatarURL({ dynamic: true, size: 1024 }))
             .addFields(
-                { name: 'Server Name', value: `${guild.name}`, inline: true },
-                { name: 'Total Members', value: `${memberCount}`, inline: true },
-                { name: 'Users', value: `${userCount}`, inline: true },
-                { name: 'Bots', value: `${botCount}`, inline: true },
-                { name: 'Uptime', value: `${uptime}`, inline: true },
-                { name: 'Ping', value: `${client.ws.ping}ms`, inline: true },
+                { name: 'Bot Tag:', value: `\`${interaction.client.user.tag}\``, inline: true },
+                { name: 'Bot ID:', value: `\`${interaction.client.user.id}\``, inline: true },
+                { name: '\u200B', value: '\u200B', inline: true }, // Empty field for spacing
+                { name: 'Developer:', value: 'melon.is', inline: true },
+                { name: 'Created On:', value: moment(interaction.client.user.createdAt).format('LL'), inline: true },
+                { name: 'Servers:', value: `${interaction.client.guilds.cache.size}`, inline: true },
+                { name: 'Total Users:', value: `${interaction.client.users.cache.size}`, inline: true },
+                { name: 'Ping:', value: `Heartbeat: \`${botLatency}ms\`\nAPI Latency: \`${apiLatency}ms\``, inline: true },
+                { name: 'Commands:', value: `${interaction.client.commands.size}`, inline: true }
             )
-            .setThumbnail(client.user.displayAvatarURL())
-            .setFooter({ text: `Requested by ${interaction.user.tag}` })
-            .setTimestamp();
+            .setTimestamp()
+            .setFooter({ text: `Requested by ${interaction.user.tag}` });
 
-        await interaction.reply({ embeds: [botInfoEmbed] });
+        await interaction.editReply({ embeds: [infoEmbed] });
     },
 };
