@@ -16,7 +16,6 @@ const UNVERIFIED_ROLE_ID = '1401625907482984551';
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
-
         // --- Handle Button Interactions ---
         if (interaction.isButton()) {
             if (interaction.customId === 'verify-button') {
@@ -72,7 +71,7 @@ module.exports = {
             return;
         }
 
-        // --- Handle Slash Command Interactions (revised) ---
+        // --- Handle Slash Command Interactions ---
         if (!interaction.isChatInputCommand()) return;
 
         const command = interaction.client.commands.get(interaction.commandName);
@@ -90,7 +89,7 @@ module.exports = {
         try {
             console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.tag}`);
 
-            // This is the CRITICAL change: Defer the reply for all slash commands here.
+            // Defer the reply for all slash commands here.
             // This prevents the "Unknown interaction" error by acknowledging the command
             // within the 3-second API timeout. The bot now has up to 15 minutes to reply.
             await interaction.deferReply();

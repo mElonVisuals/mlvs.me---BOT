@@ -1,53 +1,49 @@
 /**
- * User Info Command
- * Displays detailed information about a user.
+ * userinfo.js
+ * Provides information about a user.
  */
 
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const moment = require('moment'); // Make sure you have this library installed
+const { SlashCommandBuilder } = require('discord.js');
+const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 
 module.exports = {
-    category: 'Information',
-    
     data: new SlashCommandBuilder()
         .setName('userinfo')
-        .setDescription('Displays information about a user or yourself')
+        .setDescription('Displays information about a user.')
         .addUserOption(option =>
-            option
-                .setName('user')
-                .setDescription('The user to get info about (defaults to you)')
-                .setRequired(false)),
-
+            option.setName('target')
+                .setDescription('The user to get information about')
+        ),
     async execute(interaction) {
-        // Defer the reply immediately to prevent a timeout.
-        await interaction.deferReply();
+        // The deferReply() is now handled in interactionCreate.js
+        // No need to defer here, as it would cause an error.
         
-        const user = interaction.options.getUser('user') || interaction.user;
-        const member = interaction.guild.members.cache.get(user.id);
-        
-        if (!member) {
-            await interaction.editReply({ content: 'I could not find that user in this server.', ephemeral: true });
-            return;
+        try {
+            const targetUser = interaction.options.getUser('target') || interaction.user;
+            const member = interaction.guild.members.cache.get(targetUser.id);
+            
+            const userInfoEmbed = new CustomEmbedBuilder(interaction.client)
+                .info(`User Information for ${targetUser.tag}`)
+                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    { name: 'User Tag', value: targetUser.tag, inline: true },
+                    { name: 'User ID', value: targetUser.id, inline: true },
+                    { name: 'Bot Account', value: targetUser.bot ? 'Yes' : 'No', inline: true },
+                    { name: 'Account Created', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:f>`, inline: false },
+                    { name: 'Joined Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: false },
+                    { name: 'Roles', value: member.roles.cache.map(role => role.toString()).join(' ') || 'None', inline: false }
+                );
+
+            // Use editReply() instead of reply() because the interaction has been deferred.
+            await interaction.editReply({ embeds: [userInfoEmbed] });
+            
+        } catch (error) {
+            console.error(`[ERROR] Failed to fetch user information for user ${interaction.user.tag}:`, error);
+            const errorEmbed = new CustomEmbedBuilder(interaction.client).error(
+                'User Info Error',
+                'Failed to retrieve user information. Please try again later.'
+            );
+            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
         }
-
-        const infoEmbed = new EmbedBuilder()
-            .setColor(member.displayHexColor !== '#000000' ? member.displayHexColor : '#0099ff')
-            .setTitle(`User Info for ${user.username}`)
-            .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 1024 }))
-            .addFields(
-                { name: 'User Tag:', value: `\`${user.tag}\``, inline: true },
-                { name: 'User ID:', value: `\`${user.id}\``, inline: true },
-                { name: '\u200B', value: '\u200B', inline: true }, // Empty field for spacing
-                { name: 'Joined Discord:', value: moment(user.createdAt).format('LL'), inline: true },
-                { name: 'Joined Server:', value: moment(member.joinedAt).format('LL'), inline: true },
-                { name: '\u200B', value: '\u200B', inline: true }, // Empty field for spacing
-                { name: 'Roles:', value: member.roles.cache.size > 1 ? member.roles.cache.filter(r => r.id !== interaction.guild.id).map(r => r.toString()).join(', ') : 'None', inline: false },
-                { name: 'Highest Role:', value: member.roles.highest.toString(), inline: true },
-                { name: 'Is Bot:', value: user.bot ? 'Yes' : 'No', inline: true }
-            )
-            .setTimestamp()
-            .setFooter({ text: `Requested by ${interaction.user.tag}` });
-
-        await interaction.editReply({ embeds: [infoEmbed] });
     },
 };
