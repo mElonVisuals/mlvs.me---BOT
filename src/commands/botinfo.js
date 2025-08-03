@@ -1,12 +1,12 @@
 /**
  * @file botinfo.js
  * @description Provides information about the bot.
- * This version removes duplicate deferral and handles errors gracefully.
+ * This version corrects the file path for the 'utils' module.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder } = require('../utils/embedBuilder');
-const { getBotUptime } = require('../utils/utils');
+const { CustomEmbedBuilder } = require('../utils/embedBuilder.js'); // Corrected path to embedBuilder
+const { getBotUptime } = require('../utils/utils.js'); // Corrected file path to include the .js extension
 const os = require('os');
 
 module.exports = {
