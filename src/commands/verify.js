@@ -12,13 +12,12 @@ module.exports = {
 
     async execute(interaction) {
         // --- Create the improved verification embed ---
-        // Note: The custom image URLs and the bot's own avatar are used for a consistent theme.
-        // You'll still need to replace the placeholder emoji IDs with your own animated emoji.
+        // Note: This version maintains all of your custom emoji IDs and image links.
         const verificationEmbed = new EmbedBuilder()
             .setColor('#2ecc71') // A fresh, vibrant green to represent 'go' or 'verified'
-            .setTitle('<a:thisr:1401642268992999546>  Welcome to mlvs.me! Please Verify to Continue <a:thisl:1401642267759874190>')
+            .setTitle('<a:thisr:1401642268992999546> Welcome to mlvs.me! Please Verify to Continue <a:thisl:1401642267759874190>')
             .setDescription(
-                `Hello <@${interaction.user.id}>! To gain full access to the server, you must click the verification button below.
+                `Welcome to the server! To gain full access to the channels and community, you must click the verification button below.
 
                 This is a mandatory step to keep our community safe and bot-free. Once you verify, you will be granted the necessary roles and can begin exploring!`
             )
