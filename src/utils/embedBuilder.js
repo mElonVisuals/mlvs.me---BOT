@@ -5,6 +5,9 @@
 
 const { EmbedBuilder } = require('discord.js');
 
+// Get the version directly from the package.json file
+const { version } = require('../../package.json');
+
 // Bot theme configuration
 const THEME = {
     colors: {
@@ -12,7 +15,7 @@ const THEME = {
         success: 0x10B981,    // Green
         error: 0xEF4444,      // Red
         warning: 0xF59E0B,    // Yellow
-        info: 0x3B82F6       // Blue
+        info: 0x3B82F6      // Blue
     },
     emojis: {
         // Replace these with your actual custom emoji IDs
@@ -50,7 +53,9 @@ class CustomEmbedBuilder {
                 iconURL: this.client.user.displayAvatarURL()
             })
             .setTimestamp()
-            .setFooter({ text: `${this.client.user.username} v${process.env.BOT_VERSION}` });
+            // Fix: Replaced process.env.BOT_VERSION with the version constant
+            // from package.json to ensure the version is always found.
+            .setFooter({ text: `${this.client.user.username} v${version} • mlvs.me` });
     }
     
     /**
