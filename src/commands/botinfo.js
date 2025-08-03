@@ -1,12 +1,13 @@
 /**
  * @file botinfo.js
  * @description Provides information about the bot.
- * This version corrects the file path for the 'utils' module.
+ * This version assumes the correct file paths for the 'utils' and 'embedBuilder' modules.
+ * Please ensure that 'utils.js' and 'embedBuilder.js' exist in the 'src/utils' directory.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder } = require('../utils/embedBuilder.js'); // Corrected path to embedBuilder
-const { getBotUptime } = require('../utils/utils.js'); // Corrected file path to include the .js extension
+const { CustomEmbedBuilder } = require('../utils/embedBuilder.js');
+const { getBotUptime } = require('../utils/utils.js');
 const os = require('os');
 
 module.exports = {
