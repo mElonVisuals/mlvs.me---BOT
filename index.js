@@ -1,13 +1,13 @@
 /**
- * Main entry point for the Discord bot.
- * Initializes the Discord client, loads commands and events, and connects to the database.
+ * COMPLETE FIXED INDEX.JS
+ * Replace your entire index.js file with this version
  */
 
 // Load environment variables from .env file
 require('dotenv').config();
 
 // Import necessary classes from the discord.js library
-const { Client, Collection, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, EmbedBuilder, MessageFlags } = require('discord.js');
 
 // Import utility functions for loading commands and events, and for database connection
 const { loadCommands } = require('./src/utils/commandLoader');
@@ -56,8 +56,11 @@ async function initializeBot() {
                 return;
             }
 
+            console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.username}`);
+
             try {
-                // --- Permission & Owner Checks ---
+                // --- PRE-EXECUTION PERMISSION CHECKS (before deferring) ---
+                // These checks happen BEFORE the command tries to defer, preventing conflicts
 
                 // Check if the command is for the owner only
                 if (command.ownerOnly && interaction.user.id !== BOT_OWNER_ID) {
@@ -66,44 +69,67 @@ async function initializeBot() {
                         .setTitle('Permission Denied')
                         .setDescription('This command is only available to the bot owner.')
                         .setTimestamp();
-                    return await interaction.reply({ embeds: [forbiddenEmbed], ephemeral: true });
+                    return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
                 }
 
                 // Check for role-based permissions if defined in the command file
                 if (command.permissions && command.permissions.length > 0) {
-                    const memberRoles = interaction.member.roles.cache;
-                    const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
+                    const memberRoles = interaction.member?.roles?.cache;
+                    if (!memberRoles) {
+                        const forbiddenEmbed = new EmbedBuilder()
+                            .setColor(0xFEE75C)
+                            .setTitle('Permission Denied')
+                            .setDescription('Unable to verify your permissions. Please try again.')
+                            .setTimestamp();
+                        return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
+                    }
 
+                    const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
                     if (!hasPermission) {
                         const forbiddenEmbed = new EmbedBuilder()
                             .setColor(0xFEE75C)
                             .setTitle('Permission Denied')
                             .setDescription('You do not have the required role to use this command.')
                             .setTimestamp();
-                        return await interaction.reply({ embeds: [forbiddenEmbed], ephemeral: true });
+                        return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
                     }
                 }
 
-                // If all checks pass, execute the command
+                // If all permission checks pass, execute the command
                 await command.execute(interaction);
+
             } catch (error) {
-                // Log the error to the console for debugging
-                console.error(error);
+                console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
 
-                // Create a user-friendly error message using an embed
-                const errorEmbed = new EmbedBuilder()
-                    .setColor(0xED4245)
-                    .setTitle('An Error Occurred')
-                    .setDescription('There was an error while executing this command. Please try again later.')
-                    .setTimestamp();
+                // Only attempt to respond if we haven't already responded
+                if (!interaction.replied && !interaction.deferred) {
+                    try {
+                        const errorEmbed = new EmbedBuilder()
+                            .setColor(0xED4245)
+                            .setTitle('An Error Occurred')
+                            .setDescription('There was an error while executing this command. Please try again later.')
+                            .setTimestamp();
 
-                // Check if the interaction has already been replied to or deferred
-                if (interaction.replied || interaction.deferred) {
-                    // Use followUp if a reply has already been sent or deferred
-                    await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
-                } else {
-                    // Otherwise, send a new reply
-                    await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+                        await interaction.reply({ 
+                            embeds: [errorEmbed], 
+                            flags: MessageFlags.Ephemeral 
+                        });
+                    } catch (replyError) {
+                        console.error(`[ERROR] Failed to send error response for ${interaction.commandName}:`, replyError);
+                        // Don't try to respond again - just log it
+                    }
+                } else if (interaction.deferred && !interaction.replied) {
+                    try {
+                        const errorEmbed = new EmbedBuilder()
+                            .setColor(0xED4245)
+                            .setTitle('An Error Occurred')
+                            .setDescription('There was an error while executing this command. Please try again later.')
+                            .setTimestamp();
+
+                        await interaction.editReply({ embeds: [errorEmbed] });
+                    } catch (editError) {
+                        console.error(`[ERROR] Failed to edit deferred response for ${interaction.commandName}:`, editError);
+                    }
                 }
             }
         });
