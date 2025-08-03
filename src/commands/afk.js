@@ -8,6 +8,7 @@ const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 const { query } = require('../utils/database');
 
 module.exports = {
+     category: 'Utility',
     data: new SlashCommandBuilder()
         .setName('afk')
         .setDescription('Set your AFK status with an optional message')

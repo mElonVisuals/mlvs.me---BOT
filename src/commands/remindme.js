@@ -5,6 +5,7 @@ const ms = require('ms');
 const { query } = require('../utils/database');
 
 module.exports = {
+    category: 'Utility',
     data: new SlashCommandBuilder()
         .setName('remindme')
         .setDescription('Sets a reminder for yourself.')

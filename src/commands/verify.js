@@ -5,6 +5,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
+    category: 'Utility',
     // Define the slash command
     data: new SlashCommandBuilder()
         .setName('verify')

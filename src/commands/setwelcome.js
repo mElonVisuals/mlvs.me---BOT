@@ -9,6 +9,7 @@ const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
 const { setGuildSetting } = require('../utils/database'); // New utility to handle database queries
 
 module.exports = {
+    category: 'Utility',
     // Command data: defines the command name, description, and options.
     data: new SlashCommandBuilder()
         .setName('setwelcome')

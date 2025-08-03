@@ -3,44 +3,72 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
-    category: 'Utility', // This command also has a category
+    category: 'Utility',
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Display information about available commands'),
 
     async execute(interaction) {
         const { client } = interaction;
+        
+        // Get your bot's owner ID from the main file or configuration
+        const BOT_OWNER_ID = '952705075711729695';
+        const isOwner = interaction.user.id === BOT_OWNER_ID;
 
         // Create an object to store commands grouped by category
         const categorizedCommands = new Map();
 
         // Iterate through all commands and group them
         for (const [name, command] of client.commands) {
-            const category = command.category || 'Uncategorized';
-            if (!categorizedCommands.has(category)) {
-                categorizedCommands.set(category, []);
+            // Check permissions before adding to the list
+            let canView = true;
+
+            // Check if the command is for the owner only.
+            if (command.ownerOnly && !isOwner) {
+                canView = false;
             }
-            categorizedCommands.get(category).push(command);
+
+            // Check for role-based permissions.
+            if (canView && command.permissions && command.permissions.length > 0) {
+                const memberRoles = interaction.member.roles.cache;
+                const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
+                if (!hasPermission) {
+                    canView = false;
+                }
+            }
+
+            // Only add commands the user can see
+            if (canView) {
+                const category = command.category || 'Uncategorized';
+                if (!categorizedCommands.has(category)) {
+                    categorizedCommands.set(category, []);
+                }
+                categorizedCommands.get(category).push(command);
+            }
         }
 
         // Create the main help embed
         const helpEmbed = new EmbedBuilder()
-            .setColor(0x5865F2) // Use a consistent, modern color
+            .setColor(0x5865F2)
             .setTitle(`🤖 ${client.user.username} Commands`)
             .setDescription('Here is a list of all available commands, organized by category.')
             .setThumbnail(client.user.displayAvatarURL());
 
         // Add a field for each category
-        for (const [category, commands] of categorizedCommands) {
-            const commandList = commands
-                .map(cmd => `\`/${cmd.data.name}\` - ${cmd.data.description}`)
-                .join('\n');
-
-            helpEmbed.addFields({
-                name: `__${category}__`,
-                value: commandList,
-                inline: false
-            });
+        if (categorizedCommands.size > 0) {
+            for (const [category, commands] of categorizedCommands) {
+                const commandList = commands
+                    .map(cmd => `\`/${cmd.data.name}\` - ${cmd.data.description}`)
+                    .join('\n');
+    
+                helpEmbed.addFields({
+                    name: `__${category}__`,
+                    value: commandList,
+                    inline: false
+                });
+            }
+        } else {
+            helpEmbed.setDescription('You do not have access to any commands.');
         }
 
         // Add quick links and a footer

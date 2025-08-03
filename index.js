@@ -34,6 +34,63 @@ async function initializeBot() {
         // Initialize the database connection and table (this is the fix!)
         await initDatabase(); // Correct function name
 
+        const BOT_OWNER_ID = '952705075711729695';
+
+    client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = interaction.client.commands.get(interaction.commandName);
+
+    if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+    }
+
+    try {
+        // --- Permission & Owner Check ---
+        
+        // Check if the command is for the owner only.
+        if (command.ownerOnly && interaction.user.id !== BOT_OWNER_ID) {
+            const forbiddenEmbed = new EmbedBuilder()
+                .setColor(0xFEE75C)
+                .setTitle('Permission Denied')
+                .setDescription('This command is only available to the bot owner.')
+                .setTimestamp();
+            return await interaction.reply({ embeds: [forbiddenEmbed], ephemeral: true });
+        }
+
+        // Check for role-based permissions.
+        if (command.permissions && command.permissions.length > 0) {
+            const memberRoles = interaction.member.roles.cache;
+            const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
+
+            if (!hasPermission) {
+                const forbiddenEmbed = new EmbedBuilder()
+                    .setColor(0xFEE75C)
+                    .setTitle('Permission Denied')
+                    .setDescription('You do not have the required role to use this command.')
+                    .setTimestamp();
+                return await interaction.reply({ embeds: [forbiddenEmbed], ephemeral: true });
+            }
+        }
+        
+        // If all checks pass, execute the command.
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        const errorEmbed = new EmbedBuilder()
+            .setColor(0xED4245)
+            .setTitle('An Error Occurred')
+            .setDescription('There was an error while executing this command. Please try again later.')
+            .setTimestamp();
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
+        } else {
+            await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+        }
+    }
+});
+
         // Log in to Discord
         await client.login(process.env.DISCORD_TOKEN);
         console.log('✨ Bot logged in successfully!');
