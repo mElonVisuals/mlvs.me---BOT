@@ -19,9 +19,16 @@ const THEME = {
         success: '<:tick:1400984418004504596>',
         error: '<:error:1400984416133840957>',
         loading: '<a:loading:1400984419350876161>',
-        info: '<:info1:1400984414325837975> ',
+        info: '<:info1:1400984414325837975>',
         star: '<a:star_spin:1400984411935346698>',
         ping: '<a:alert:1400984409607507978> '
+    },
+    // New placeholder image URLs for when assets are missing
+    placeholders: {
+        banner: 'https://via.placeholder.com/400x100/7C3AED/FFFFFF?text=mlvs.me',
+        avatar: 'https://via.placeholder.com/256x256/7C3AED/FFFFFF?text=USER',
+        serverIcon: 'https://via.placeholder.com/256x256/7C3AED/FFFFFF?text=SERVER',
+        botIcon: 'https://via.placeholder.com/256x256/7C3AED/FFFFFF?text=BOT'
     }
 };
 
@@ -31,18 +38,26 @@ class CustomEmbedBuilder {
     }
 
     /**
-     * Creates a base embed with consistent styling
+     * Creates a base embed with common settings
      */
     createBaseEmbed(type = 'primary') {
-        const embed = new EmbedBuilder()
-            .setColor(THEME.colors[type] || THEME.colors.primary)
+        let color = THEME.colors[type] || THEME.colors.primary;
+        
+        return new EmbedBuilder()
+            .setColor(color)
+            .setAuthor({ 
+                name: this.client.user.username,
+                iconURL: this.client.user.displayAvatarURL()
+            })
             .setTimestamp()
-            .setFooter({
-                text: `${process.env.BOT_NAME || 'mlvs.me'} • v${process.env.BOT_VERSION || '1.0.0'}`,
-                iconURL: this.client?.user?.displayAvatarURL() || undefined
-            });
-
-        return embed;
+            .setFooter({ text: `${this.client.user.username} v${process.env.BOT_VERSION}` });
+    }
+    
+    /**
+     * Gets a placeholder image URL
+     */
+    getPlaceholder(type) {
+        return THEME.placeholders[type] || null;
     }
 
     /**
@@ -109,7 +124,7 @@ class CustomEmbedBuilder {
      * Creates a loading embed
      */
     loading(title, description) {
-        return this.createBaseEmbed('primary')
+        return this.createBaseEmbed('info')
             .setTitle(`${THEME.emojis.loading} ${title}`)
             .setDescription(description);
     }

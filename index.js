@@ -7,7 +7,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { loadCommands } = require('./src/utils/commandLoader');
 const { loadEvents } = require('./src/utils/eventLoader');
-const { initializeDatabase } = require('./src/utils/database');
+const { initializeDatabase } = require('./src/utils/database'); // Import the new database utility
 
 // Validate required environment variables
 if (!process.env.DISCORD_TOKEN) {
@@ -17,12 +17,6 @@ if (!process.env.DISCORD_TOKEN) {
 
 if (!process.env.CLIENT_ID) {
     console.error('❌ CLIENT_ID is not set in .env file');
-    process.exit(1);
-}
-
-// Validate required database environment variables
-if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
-    console.error('❌ One or more required database variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME) are not set in .env file.');
     process.exit(1);
 }
 
@@ -45,16 +39,16 @@ client.commands = new Collection();
 async function initializeBot() {
     try {
         console.log('🚀 Starting mlvs.me bot...');
-
-        // Initialize the database connection
-        await initializeDatabase();
-
+        
         // Load commands and events
         await loadCommands(client);
         await loadEvents(client);
+        
+        // Initialize database connection
+        await initializeDatabase(); // Call the new database initialization function
 
         console.log('🔐 Attempting to login to Discord...');
-
+        
         // Login to Discord
         await client.login(process.env.DISCORD_TOKEN);
     } catch (error) {
@@ -74,8 +68,7 @@ process.on('unhandledRejection', error => {
 process.on('uncaughtException', error => {
     console.error('❌ Uncaught exception:', error);
     console.error('Stack trace:', error.stack);
-    process.exit(1);
 });
 
-// Run the initialization function
+// Start the bot
 initializeBot();

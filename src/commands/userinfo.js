@@ -1,12 +1,13 @@
-// src/commands/userinfo.js
+/**
+ * User Info Command
+ * Displays detailed information about a Discord user
+ */
 
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
+const ms = require('ms');
 
 module.exports = {
-    // Add a category property
-    category: 'General',
-
     data: new SlashCommandBuilder()
         .setName('userinfo')
         .setDescription('Display detailed information about a user')
@@ -20,11 +21,14 @@ module.exports = {
     async execute(interaction) {
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
         
+        // Get the target user (either mentioned user or command author)
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.guild.members.cache.get(targetUser.id);
 
+        // Fetch the full user to get flags/badges
         let fullUser;
         try {
+            // Force fetch with cache bypass to get all user data including flags
             fullUser = await interaction.client.users.fetch(targetUser.id, { force: true, cache: false });
             console.log(`📊 Fetched user data for ${fullUser.username} (${fullUser.id})`);
         } catch (error) {
@@ -32,68 +36,73 @@ module.exports = {
             console.error('❌ Could not fetch full user data:', error.message);
         }
 
-        const userCreatedAt = targetUser.createdAt;
-        const accountAge = Math.floor((Date.now() - userCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
-        const memberJoinedAt = targetMember?.joinedAt;
-        const memberAge = memberJoinedAt ? Math.floor((Date.now() - memberJoinedAt.getTime()) / (1000 * 60 * 60 * 24)) : null;
-
-        const roles = targetMember ? targetMember.roles.cache
-            .filter(role => role.id !== interaction.guild.id)
-            .sort((a, b) => b.position - a.position)
-            .map(role => `<@&${role.id}>`)
-            .join(' ') : 'Not in this server';
-
-        const permissions = targetMember ? targetMember.permissions.toArray()
-            .map(p => `\`${p}\``)
-            .sort()
-            .join(', ') : 'N/A';
-
+        // User account info
+        const createdAt = fullUser.createdAt;
+        const accountAge = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
         const badges = fullUser.flags?.toArray() || [];
 
+        // Member info (if user is in the guild)
+        let joinedAt, memberAge, roles, permissions;
+        if (targetMember) {
+            joinedAt = targetMember.joinedAt;
+            memberAge = Math.floor((Date.now() - joinedAt.getTime()) / (1000 * 60 * 60 * 24));
+            roles = targetMember.roles.cache
+                .filter(role => role.id !== interaction.guild.roles.everyone.id)
+                .sort((a, b) => b.position - a.position)
+                .map(role => role.toString());
+            
+            permissions = targetMember.permissions.toArray()
+                .filter(p => p !== 'ViewChannel' && p !== 'ReadMessageHistory' && p !== 'SendMessages')
+                .map(p => `\`${p}\``);
+        }
+
         const userInfoEmbed = embedBuilder.info(
-            `User Info: ${targetUser.username}`,
-            `A detailed overview of **${targetUser.username}**.`
-        )
-        .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 1024 }))
-        .addFields(
+            `User Info for ${fullUser.username}`,
+            `A detailed profile of the user.`,
             [
                 {
-                    name: '👤 User Details',
-                    value: [
-                        `**ID:** \`${targetUser.id}\``,
-                        `**Bot:** ${targetUser.bot ? '✅ Yes' : '❌ No'}`,
-                        `**Account Created:** <t:${Math.floor(userCreatedAt.getTime() / 1000)}:F>`,
-                        `**Account Age:** ${accountAge} days`
-                    ].join('\n'),
+                    name: '🆔 User ID',
+                    value: `\`${fullUser.id}\``,
                     inline: false
+                },
+                {
+                    name: '👤 Account Info',
+                    value: [
+                        `**Created:** <t:${Math.floor(createdAt.getTime() / 1000)}:F>`,
+                        `**Age:** ${accountAge} days`
+                    ].join('\n'),
+                    inline: true
                 }
             ]
         );
 
         if (targetMember) {
             userInfoEmbed.addFields({
-                name: 'Server Details',
+                name: '📊 Member Info',
                 value: [
-                    `**Joined Server:** <t:${Math.floor(memberJoinedAt.getTime() / 1000)}:F>`,
-                    `**Joined Age:** ${memberAge} days`,
-                    `**Nickname:** ${targetMember.nickname || 'None'}`
+                    `**Joined:** <t:${Math.floor(joinedAt.getTime() / 1000)}:F>`,
+                    `**Member Age:** ${memberAge} days`
                 ].join('\n'),
-                inline: false
+                inline: true
             });
         }
         
-        userInfoEmbed.setTimestamp(new Date());
-        userInfoEmbed.setImage(fullUser.bannerURL({ dynamic: true, size: 1024 }) || null);
+        // Use placeholders for avatar and banner
+        userInfoEmbed
+        .setThumbnail(fullUser.displayAvatarURL({ dynamic: true, size: 1024 }) || embedBuilder.getPlaceholder('avatar'))
+        .setImage(fullUser.bannerURL({ dynamic: true, size: 1024 }) || null); // Note: Discord banners are often not available, null is a good fallback
 
-        if (roles.length > 0) {
+        // Add roles if user is in server
+        if (targetMember && roles.length > 0) {
             userInfoEmbed.addFields({
                 name: `🎭 Roles [${targetMember.roles.cache.size - 1}]`,
-                value: roles.length > 0 ? roles : 'No roles',
+                value: roles.length > 0 ? roles.join(' ') : 'No roles',
                 inline: false
             });
         }
 
-        if (permissions.length > 0) {
+        // Add permissions if user has any
+        if (targetMember && permissions.length > 0) {
             userInfoEmbed.addFields({
                 name: '🔑 Key Permissions',
                 value: permissions.join(', '),
@@ -101,32 +110,16 @@ module.exports = {
             });
         }
 
+        // Add badges if user has any
         if (badges.length > 0) {
-            const badgeEmojis = {
-                'Staff': '<:staff:1400984419992592476>', // Replace with your emoji IDs
-                'Partner': '<:partner:1400984419992592476>',
-                'Hypesquad': '<:hypesquad:1400984419992592476>',
-                'BugHunterLevel1': '<:bughunter:1400984419992592476>',
-                'BugHunterLevel2': '<:bughunter:1400984419992592476>',
-                'HypeSquadOnlineHouse1': '<:bravery:1400984419992592476>',
-                'HypeSquadOnlineHouse2': '<:brilliance:1400984419992592476>',
-                'HypeSquadOnlineHouse3': '<:balance:1400984419992592476>',
-                'PremiumEarlySupporter': '<:earlysupporter:1400984419992592476>',
-                'TeamPseudoUser': '<:team:1400984419992592476>',
-                'VerifiedBot': '<:verifiedbot:1400984419992592476>',
-                'VerifiedDeveloper': '<:verifieddev:1400984419992592476>',
-                'CertifiedModerator': '<:moderator:1400984419992592476>',
-                'ActiveDeveloper': '<:activedev:1400984419992592476>'
-            };
-            const badgeList = badges.map(badge => badgeEmojis[badge] || badge).join(' ');
-            
             userInfoEmbed.addFields({
                 name: '🏆 Badges',
-                value: badgeList,
+                value: badges.join('\n'),
                 inline: false
             });
         }
 
+        // Add status information if user is in server
         if (targetMember) {
             const status = targetMember.presence?.status || 'offline';
             const statusEmojis = {

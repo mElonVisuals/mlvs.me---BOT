@@ -1,75 +1,88 @@
 /**
- * Database Utility
- * Manages the connection to a MySQL database and handles table creation.
+ * Database Utility for MySQL
+ * Handles connection and queries for guild settings.
  */
-
 const mysql = require('mysql2/promise');
 
-let pool;
+// Validate required environment variables for the database
+const requiredDbVars = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_DATABASE'];
+for (const envVar of requiredDbVars) {
+    if (!process.env[envVar]) {
+        console.error(`❌ Missing required environment variable: ${envVar}`);
+        process.exit(1);
+    }
+}
+console.log('✅ Database environment variables loaded successfully');
 
+let connection;
+
+/**
+ * Initializes and tests the database connection.
+ */
 async function initializeDatabase() {
     try {
-        // Create a connection pool using environment variables
-        pool = mysql.createPool({
+        console.log('🔗 Connecting to MySQL database...');
+        connection = await mysql.createConnection({
             host: process.env.DB_HOST,
             user: process.env.DB_USER,
             password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-            waitForConnections: true,
-            connectionLimit: 10,
-            queueLimit: 0
+            database: process.env.DB_DATABASE
         });
-
-        console.log('✅ MySQL connection pool created successfully.');
-
-        // Verify the connection and create tables
-        const connection = await pool.getConnection();
-        console.log('✅ Connected to MySQL database.');
-
-        // Create 'reminders' table if it doesn't exist
-        await connection.execute(`
-            CREATE TABLE IF NOT EXISTS reminders (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id VARCHAR(255) NOT NULL,
-                channel_id VARCHAR(255) NOT NULL,
-                message TEXT NOT NULL,
-                timestamp BIGINT NOT NULL
-            );
-        `);
-        console.log('✅ Reminders table checked/created.');
-
-        // Create 'afk_users' table if it doesn't exist
-        await connection.execute(`
-            CREATE TABLE IF NOT EXISTS afk_users (
-                user_id VARCHAR(255) PRIMARY KEY,
-                message VARCHAR(255) NOT NULL,
-                timestamp BIGINT NOT NULL
-            );
-        `);
-        console.log('✅ AFK Users table checked/created.');
-
-        connection.release();
+        console.log('✅ Successfully connected to the MySQL database!');
     } catch (error) {
-        console.error('❌ Failed to connect to database or create tables:', error);
+        console.error('❌ Failed to connect to MySQL database:', error);
         process.exit(1);
     }
 }
 
 /**
- * Executes a MySQL query using the connection pool.
- * @param {string} sql The SQL query string.
- * @param {Array} params The parameters for the query.
- * @returns {Promise<Array>} The query results.
+ * Retrieves a single setting for a guild from the database.
+ * @param {string} guildId - The ID of the guild.
+ * @param {string} settingKey - The key of the setting to retrieve (e.g., 'welcomeChannelId').
+ * @returns {Promise<string|null>} The value of the setting, or null if not found.
  */
-async function query(sql, params) {
-    if (!pool) {
-        throw new Error('Database pool not initialized. Call initializeDatabase() first.');
+async function getGuildSetting(guildId, settingKey) {
+    try {
+        if (!connection) {
+            await initializeDatabase();
+        }
+
+        const [rows] = await connection.execute(
+            'SELECT settingValue FROM guildSettings WHERE guildId = ? AND settingKey = ?',
+            [guildId, settingKey]
+        );
+        return rows.length > 0 ? rows[0].settingValue : null;
+    } catch (error) {
+        console.error(`❌ Error retrieving setting '${settingKey}' for guild ${guildId}:`, error);
+        return null;
     }
-    const [rows] = await pool.execute(sql, params);
-    return rows;
+}
+
+/**
+ * Sets or updates a single setting for a guild in the database.
+ * @param {string} guildId - The ID of the guild.
+ * @param {string} settingKey - The key of the setting to set.
+ * @param {string|null} settingValue - The value of the setting.
+ */
+async function setGuildSetting(guildId, settingKey, settingValue) {
+    try {
+        if (!connection) {
+            await initializeDatabase();
+        }
+
+        await connection.execute(
+            'INSERT INTO guildSettings (guildId, settingKey, settingValue) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE settingValue = ?',
+            [guildId, settingKey, settingValue, settingValue]
+        );
+        console.log(`💾 Saved setting '${settingKey}' for guild ${guildId}.`);
+    } catch (error) {
+        console.error(`❌ Error saving setting '${settingKey}' for guild ${guildId}:`, error);
+        throw error;
+    }
 }
 
 module.exports = {
     initializeDatabase,
-    query
+    getGuildSetting,
+    setGuildSetting
 };
