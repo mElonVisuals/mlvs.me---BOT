@@ -11,11 +11,11 @@ const { version } = require('../../package.json');
 // Bot theme configuration
 const THEME = {
     colors: {
-        primary: 0x7C3AED,    // Purple
-        success: 0x10B981,    // Green
-        error: 0xEF4444,      // Red
-        warning: 0xF59E0B,    // Yellow
-        info: 0x3B82F6      // Blue
+        primary: 0x7C3AED,    // Purple
+        success: 0x10B981,    // Green
+        error: 0xEF4444,      // Red
+        warning: 0xF59E0B,    // Yellow
+        info: 0x3B82F6      // Blue
     },
     emojis: {
         // Replace these with your actual custom emoji IDs
@@ -70,8 +70,11 @@ class CustomEmbedBuilder {
      */
     success(title, description, fields = []) {
         const embed = this.createBaseEmbed('success')
-            .setTitle(`${THEME.emojis.success} ${title}`)
-            .setDescription(description);
+            .setTitle(`${THEME.emojis.success} ${title}`);
+        
+        if (description) {
+            embed.setDescription(description);
+        }
 
         if (fields.length > 0) {
             embed.addFields(fields);
@@ -85,8 +88,11 @@ class CustomEmbedBuilder {
      */
     error(title, description, fields = []) {
         const embed = this.createBaseEmbed('error')
-            .setTitle(`${THEME.emojis.error} ${title}`)
-            .setDescription(description);
+            .setTitle(`${THEME.emojis.error} ${title}`);
+        
+        if (description) {
+            embed.setDescription(description);
+        }
 
         if (fields.length > 0) {
             embed.addFields(fields);
@@ -100,8 +106,11 @@ class CustomEmbedBuilder {
      */
     info(title, description, fields = []) {
         const embed = this.createBaseEmbed('info')
-            .setTitle(`${THEME.emojis.info} ${title}`)
-            .setDescription(description);
+            .setTitle(`${THEME.emojis.info} ${title}`);
+        
+        if (description) {
+            embed.setDescription(description);
+        }
 
         if (fields.length > 0) {
             embed.addFields(fields);
@@ -115,8 +124,11 @@ class CustomEmbedBuilder {
      */
     warning(title, description, fields = []) {
         const embed = this.createBaseEmbed('warning')
-            .setTitle(`⚠️ ${title}`)
-            .setDescription(description);
+            .setTitle(`⚠️ ${title}`);
+        
+        if (description) {
+            embed.setDescription(description);
+        }
 
         if (fields.length > 0) {
             embed.addFields(fields);
@@ -129,9 +141,14 @@ class CustomEmbedBuilder {
      * Creates a loading embed
      */
     loading(title, description) {
-        return this.createBaseEmbed('info')
-            .setTitle(`${THEME.emojis.loading} ${title}`)
-            .setDescription(description);
+        const embed = this.createBaseEmbed('info')
+            .setTitle(`${THEME.emojis.loading} ${title}`);
+        
+        if (description) {
+            embed.setDescription(description);
+        }
+
+        return embed;
     }
 }
 

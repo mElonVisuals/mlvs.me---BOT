@@ -1,44 +1,57 @@
 /**
- * Bot Info Command
- * Displays detailed information about the bot, including latency.
+ * @file botinfo.js
+ * @description Provides information about the bot.
+ * This version removes duplicate deferral and handles errors gracefully.
  */
 
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const moment = require('moment');
+const { SlashCommandBuilder } = require('discord.js');
+const { CustomEmbedBuilder } = require('../utils/embedBuilder');
+const { getBotUptime } = require('../utils/utils');
+const os = require('os');
 
 module.exports = {
-    category: 'Information',
-    
     data: new SlashCommandBuilder()
         .setName('botinfo')
-        .setDescription('Displays information about the bot'),
-
+        .setDescription('Displays information about the bot.'),
     async execute(interaction) {
-        // Defer the reply immediately to prevent a timeout and to provide more time for processing.
-        await interaction.deferReply();
+        try {
+            const client = interaction.client;
+            
+            // As per your interactionCreate event, the reply is already deferred.
+            // Awaiting interaction.deferReply() here would cause an error.
 
-        // Calculate the bot's latency and Discord API latency
-        const botLatency = Math.round(interaction.client.ws.ping);
-        const apiLatency = Date.now() - interaction.createdTimestamp;
+            const botAvatar = client.user.displayAvatarURL({ dynamic: true });
+            const botUptime = getBotUptime(client.uptime);
+            const serverCount = client.guilds.cache.size;
+            const userCount = client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0);
+            const memoryUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
+            const cpuUsage = (os.loadavg()[0] || 'Unknown').toFixed(2);
+            
+            // Construct fields array to be passed to the embed method
+            const fields = [
+                { name: 'Developer', value: `<@${process.env.DEVELOPER_ID || 'N/A'}>`, inline: true },
+                { name: 'Servers', value: `${serverCount}`, inline: true },
+                { name: 'Users', value: `${userCount}`, inline: true },
+                { name: 'Uptime', value: botUptime, inline: false },
+                { name: 'Memory Usage', value: `${memoryUsage} MB`, inline: true },
+                { name: 'CPU Usage (1 min avg)', value: `${cpuUsage}%`, inline: true },
+                { name: 'Node.js Version', value: process.version, inline: true }
+            ];
 
-        const infoEmbed = new EmbedBuilder()
-            .setColor(0x0099ff)
-            .setTitle(`Bot Information`)
-            .setThumbnail(interaction.client.user.displayAvatarURL({ dynamic: true, size: 1024 }))
-            .addFields(
-                { name: 'Bot Tag:', value: `\`${interaction.client.user.tag}\``, inline: true },
-                { name: 'Bot ID:', value: `\`${interaction.client.user.id}\``, inline: true },
-                { name: '\u200B', value: '\u200B', inline: true }, // Empty field for spacing
-                { name: 'Developer:', value: 'melon.is', inline: true },
-                { name: 'Created On:', value: moment(interaction.client.user.createdAt).format('LL'), inline: true },
-                { name: 'Servers:', value: `${interaction.client.guilds.cache.size}`, inline: true },
-                { name: 'Total Users:', value: `${interaction.client.users.cache.size}`, inline: true },
-                { name: 'Ping:', value: `Heartbeat: \`${botLatency}ms\`\nAPI Latency: \`${apiLatency}ms\``, inline: true },
-                { name: 'Commands:', value: `${interaction.client.commands.size}`, inline: true }
-            )
-            .setTimestamp()
-            .setFooter({ text: `Requested by ${interaction.user.tag}` });
+            // Use the info method with null for description, and pass the fields array
+            const embed = new CustomEmbedBuilder(client)
+                .info('Bot Information', null, fields)
+                .setThumbnail(botAvatar);
 
-        await interaction.editReply({ embeds: [infoEmbed] });
-    },
+            await interaction.editReply({ embeds: [embed] });
+
+        } catch (error) {
+            console.error('[ERROR] An error occurred while executing command botinfo:', error);
+            const errorEmbed = new CustomEmbedBuilder(interaction.client).error(
+                'Bot Info Error',
+                'An unexpected error occurred while retrieving bot information. Please try again later.'
+            );
+            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+        }
+    }
 };
