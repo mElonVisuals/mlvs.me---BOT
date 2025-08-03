@@ -16,8 +16,9 @@ module.exports = {
 
     // Execute function
     async execute(interaction) {
-        // Defer the reply to give the bot time to process the command
-        await interaction.deferReply();
+        // The reply is already deferred in the main interactionCreate event handler,
+        // so we can proceed with fetching data and building the embed.
+        // The line "await interaction.deferReply();" has been removed here.
 
         const guild = interaction.guild;
         const owner = await guild.fetchOwner();

@@ -22,12 +22,22 @@ module.exports = {
 
     // Execute function
     async execute(interaction) {
-        // Defer the reply to give the bot time to process the command
-        await interaction.deferReply();
+        // The reply is already deferred in the main interactionCreate event handler,
+        // so we can proceed with fetching data and building the embed.
 
         // Get the target user from the command options, or the command author if no user is specified.
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.guild.members.cache.get(targetUser.id);
+
+        if (!targetMember) {
+            // If the user isn't in the guild (e.g. from another guild or has left)
+            const noMemberEmbed = new EmbedBuilder()
+                .setColor(0xF04747) // Red color for errors
+                .setDescription(`⚠️ User \`${targetUser.username}\` is not in this server.`);
+            
+            // Edit the deferred reply with an error message
+            return await interaction.editReply({ embeds: [noMemberEmbed] });
+        }
 
         // Fetch the full user to get their banner, which is not available on the base user object
         let fullUser = targetUser;
@@ -43,7 +53,7 @@ module.exports = {
             .setColor(0x5865F2) // Discord's blurple color
             .setTitle(`User Info - ${fullUser.username}`)
             // Use the target's server avatar for the thumbnail if they have one, otherwise use their global avatar
-            .setThumbnail(targetMember?.displayAvatarURL({ dynamic: true, size: 1024 }) || fullUser.displayAvatarURL({ dynamic: true, size: 1024 }))
+            .setThumbnail(targetMember.displayAvatarURL({ dynamic: true, size: 1024 }) || fullUser.displayAvatarURL({ dynamic: true, size: 1024 }))
             // Add a timestamp and footer
             .setTimestamp()
             .setFooter({
@@ -64,22 +74,19 @@ module.exports = {
         // ====================================================================
         //                       Server Stats Section
         // ====================================================================
-        // Only show server stats if the user is in the guild
-        if (targetMember) {
-            // Get the highest role the user has
-            const highestRole = targetMember.roles.highest.id === interaction.guild.id ? 'None' : targetMember.roles.highest;
-            
-            userInfoEmbed.addFields(
-                { name: '\u200b', value: '\u200b', inline: false },
-                { name: '**__- Server Stats:__**', value: '\u200b', inline: false },
-                { name: 'Nickname:', value: `${targetMember.nickname || 'None'}`, inline: true },
-                { name: 'Joined Server:', value: `🗓️ <t:${Math.floor(targetMember.joinedAt.getTime() / 1000)}:R>`, inline: true },
-                { name: 'Highest Role:', value: `${highestRole}`, inline: true }
-            );
-        }
+        // Get the highest role the user has
+        const highestRole = targetMember.roles.highest.id === interaction.guild.id ? 'None' : targetMember.roles.highest.toString();
+        
+        userInfoEmbed.addFields(
+            { name: '\u200b', value: '\u200b', inline: false },
+            { name: '**__- Server Stats:__**', value: '\u200b', inline: false },
+            { name: 'Nickname:', value: `${targetMember.nickname || 'None'}`, inline: true },
+            { name: 'Joined Server:', value: `🗓️ <t:${Math.floor(targetMember.joinedAt.getTime() / 1000)}:R>`, inline: true },
+            { name: 'Highest Role:', value: `${highestRole}`, inline: true }
+        );
 
         // ====================================================================
-        //                       Avatar Section (Replaces Badges)
+        //                       Avatars Section
         // ====================================================================
         userInfoEmbed.addFields({
             name: '\u200b', // Spacer for a new line
@@ -88,7 +95,7 @@ module.exports = {
         }, {
             name: '🖼️ Avatars:',
             value: `**Global Avatar:** [Link](${fullUser.displayAvatarURL({ dynamic: true, size: 1024 })})\n` +
-                   `**Server Avatar:** [Link](${targetMember?.displayAvatarURL({ dynamic: true, size: 1024 }) || 'None'})`,
+                    `**Server Avatar:** [Link](${targetMember.displayAvatarURL({ dynamic: true, size: 1024 }) || 'None'})`,
             inline: false
         });
 
@@ -96,7 +103,7 @@ module.exports = {
         //                       Roles Section
         // ====================================================================
         // Add roles if the user has any in this guild
-        if (targetMember && targetMember.roles.cache.size > 1) {
+        if (targetMember.roles.cache.size > 1) {
             const roles = targetMember.roles.cache
                 .filter(role => role.id !== interaction.guild.roles.everyone.id)
                 .sort((a, b) => b.position - a.position)

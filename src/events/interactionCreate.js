@@ -19,9 +19,7 @@ module.exports = {
 
         // --- Handle Button Interactions ---
         if (interaction.isButton()) {
-            // Check if the button click is from our verification button
             if (interaction.customId === 'verify-button') {
-                // Professional log message for the start of the process
                 console.log(`[INFO] Verification button clicked by user: ${interaction.user.tag} (ID: ${interaction.user.id})`);
 
                 // Defer the update immediately to prevent a timeout error.
@@ -31,7 +29,6 @@ module.exports = {
                 const roleToAdd = interaction.guild.roles.cache.get(VERIFICATION_ROLE_ID);
                 const roleToRemove = interaction.guild.roles.cache.get(UNVERIFIED_ROLE_ID);
 
-                // Check for errors before attempting to add the role
                 if (!member) {
                     console.error('[ERROR] Failed to find the member who clicked the verification button.');
                     return;
@@ -45,7 +42,6 @@ module.exports = {
                     console.error(`[WARN] Unverified role not found with ID: ${UNVERIFIED_ROLE_ID}. Skipping removal.`);
                 }
 
-                // Check if the member already has the verification role
                 if (member.roles.cache.has(VERIFICATION_ROLE_ID)) {
                     console.log(`[INFO] User ${interaction.user.tag} is already verified.`);
                     await interaction.followUp({ content: 'You have already completed the verification process.', ephemeral: true });
@@ -53,13 +49,11 @@ module.exports = {
                 }
 
                 try {
-                    // Check if the member has the unverified role before attempting to remove it.
                     if (roleToRemove && member.roles.cache.has(UNVERIFIED_ROLE_ID)) {
                         await member.roles.remove(roleToRemove);
                         console.log(`[SUCCESS] Removed unverified role from ${interaction.user.tag}.`);
                     }
 
-                    // Add the verification role to the user
                     await member.roles.add(roleToAdd);
                     console.log(`[SUCCESS] Added verification role to ${interaction.user.tag}.`);
                     
@@ -68,7 +62,6 @@ module.exports = {
                         'You have been granted access to the server. Welcome!'
                     );
                     
-                    // Reply to the user with a success message
                     await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
 
                 } catch (error) {
@@ -79,11 +72,10 @@ module.exports = {
             return;
         }
 
-        // --- Handle Slash Command Interactions (existing code) ---
+        // --- Handle Slash Command Interactions (revised) ---
         if (!interaction.isChatInputCommand()) return;
 
         const command = interaction.client.commands.get(interaction.commandName);
-
         if (!command) {
             console.error(`[ERROR] Command not found: ${interaction.commandName}.`);
             
@@ -93,12 +85,19 @@ module.exports = {
                 `The command \`/${interaction.commandName}\` does not exist or is not registered.`
             );
 
+            // Using reply() here because the interaction hasn't been deferred yet.
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
         }
 
         try {
             console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.tag}`);
+            
+            // Defer the reply right before executing the command.
+            // This prevents the "Interaction has already been acknowledged" error and command timeouts.
+            await interaction.deferReply({ ephemeral: true });
+            
+            // Execute the command
             await command.execute(interaction);
         } catch (error) {
             console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
@@ -108,14 +107,9 @@ module.exports = {
                 'Command Execution Error',
                 'An unexpected error occurred while processing your command. Please try again later.'
             );
-
-            const replyOptions = { embeds: [errorEmbed], ephemeral: true };
-
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(replyOptions);
-            } else {
-                await interaction.reply(replyOptions);
-            }
+            
+            // Since we've already deferred the reply, we must use editReply() here.
+            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
         }
     },
 };
