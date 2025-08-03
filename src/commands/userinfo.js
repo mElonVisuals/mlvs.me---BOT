@@ -1,6 +1,7 @@
 /**
  * userinfo.js
  * Provides information about a user.
+ * This version includes improved error handling and data validation.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
@@ -13,35 +14,46 @@ module.exports = {
         .addUserOption(option =>
             option.setName('target')
                 .setDescription('The user to get information about')
-        ),
+                .setRequired(false)),
     async execute(interaction) {
-        // The deferReply() is now handled in interactionCreate.js
-        // No need to defer here, as it would cause an error.
+        // Since the central interactionCreate event handler now defers all replies,
+        // we can proceed with the command logic and use editReply() at the end.
         
         try {
-            const targetUser = interaction.options.getUser('target') || interaction.user;
-            const member = interaction.guild.members.cache.get(targetUser.id);
-            
+            const member = interaction.options.getMember('target') || interaction.member;
+            if (!member) {
+                await interaction.editReply({ content: 'I could not find that user.', ephemeral: true });
+                return;
+            }
+
+            const user = member.user;
+
+            const userCreationDate = user.createdAt ? `<t:${Math.floor(user.createdTimestamp / 1000)}:f>` : 'N/A';
+            const memberJoinDate = member.joinedAt ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>` : 'N/A';
+            const userNickname = member.nickname || 'None';
+            const userStatus = member.presence?.status || 'offline';
+            const userRoles = member.roles.cache.size > 1 ? member.roles.cache.map(role => `<@&${role.id}>`).join(', ') : 'None';
+
             const userInfoEmbed = new CustomEmbedBuilder(interaction.client)
-                .info(`User Information for ${targetUser.tag}`)
-                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+                .info('User Information')
+                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                 .addFields(
-                    { name: 'User Tag', value: targetUser.tag, inline: true },
-                    { name: 'User ID', value: targetUser.id, inline: true },
-                    { name: 'Bot Account', value: targetUser.bot ? 'Yes' : 'No', inline: true },
-                    { name: 'Account Created', value: `<t:${Math.floor(targetUser.createdTimestamp / 1000)}:f>`, inline: false },
-                    { name: 'Joined Server', value: `<t:${Math.floor(member.joinedTimestamp / 1000)}:f>`, inline: false },
-                    { name: 'Roles', value: member.roles.cache.map(role => role.toString()).join(' ') || 'None', inline: false }
+                    { name: 'User Tag', value: user.tag, inline: true },
+                    { name: 'User ID', value: user.id, inline: true },
+                    { name: 'Nickname', value: userNickname, inline: true },
+                    { name: 'Status', value: userStatus, inline: true },
+                    { name: 'Joined Server', value: memberJoinDate, inline: true },
+                    { name: 'Account Created', value: userCreationDate, inline: true },
+                    { name: 'Roles', value: userRoles.length > 1024 ? 'Too many roles to display.' : userRoles, inline: false }
                 );
 
-            // Use editReply() instead of reply() because the interaction has been deferred.
             await interaction.editReply({ embeds: [userInfoEmbed] });
-            
+
         } catch (error) {
-            console.error(`[ERROR] Failed to fetch user information for user ${interaction.user.tag}:`, error);
+            console.error('[ERROR] Failed to execute userinfo command:', error);
             const errorEmbed = new CustomEmbedBuilder(interaction.client).error(
                 'User Info Error',
-                'Failed to retrieve user information. Please try again later.'
+                'An unexpected error occurred while retrieving user information. Please try again later.'
             );
             await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
         }

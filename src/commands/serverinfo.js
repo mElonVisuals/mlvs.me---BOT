@@ -1,6 +1,7 @@
 /**
  * serverinfo.js
  * Provides information about the current server.
+ * This version includes improved error handling and data validation.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
@@ -11,36 +12,53 @@ module.exports = {
         .setName('serverinfo')
         .setDescription('Displays information about the server.'),
     async execute(interaction) {
-        // The deferReply() is now handled in interactionCreate.js
-        // No need to defer here, as it would cause an error.
+        // Since the central interactionCreate event handler now defers all replies,
+        // we can proceed with the command logic and use editReply() at the end.
         
         try {
             const guild = interaction.guild;
-            const owner = await guild.fetchOwner();
-            const memberCount = guild.memberCount;
-            const onlineMembers = guild.members.cache.filter(member => member.presence?.status !== 'offline').size;
-            const channelCount = guild.channels.cache.size;
+            if (!guild) {
+                // This is a safety check, though this error is unlikely with slash commands.
+                await interaction.editReply({ content: 'I could not find a server to get information about.', ephemeral: true });
+                return;
+            }
+
+            const owner = await guild.fetchOwner().catch(() => null);
+            const memberCount = guild.memberCount || 'Unknown';
+            const onlineMembers = guild.members.cache.filter(member => member.presence?.status !== 'offline').size || 'Unknown';
+            const channelCount = guild.channels.cache.size || 'Unknown';
+            const guildDescription = guild.description || 'No description provided.';
+            const verificationLevel = guild.verificationLevel || 0;
+            const boostLevel = guild.premiumTier || 0;
 
             const serverInfoEmbed = new CustomEmbedBuilder(interaction.client)
                 .info('Server Information')
+                .setThumbnail(guild.iconURL({ dynamic: true }))
                 .addFields(
                     { name: 'Server Name', value: guild.name, inline: true },
                     { name: 'Server ID', value: guild.id, inline: true },
-                    { name: 'Owner', value: `<@${owner.user.id}>`, inline: true },
+                    { name: 'Owner', value: owner ? `<@${owner.user.id}>` : 'Unknown', inline: true },
                     { name: 'Member Count', value: `${memberCount}`, inline: true },
                     { name: 'Online Members', value: `${onlineMembers}`, inline: true },
                     { name: 'Channels', value: `${channelCount}`, inline: true },
+                    { name: 'Boost Level', value: `Level ${boostLevel}`, inline: true },
+                    { name: 'Verification Level', value: `${verificationLevel}`, inline: true },
                     { name: 'Created At', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:f>`, inline: false }
                 );
+            
+            // Add description field separately to ensure it is not inline.
+            if (guildDescription) {
+                serverInfoEmbed.setDescription(guildDescription);
+            }
 
-            // Use editReply() instead of reply() because the interaction has been deferred.
+            // Use editReply() because the interaction has been deferred in the main event handler.
             await interaction.editReply({ embeds: [serverInfoEmbed] });
             
         } catch (error) {
-            console.error('[ERROR] Failed to fetch server information:', error);
+            console.error('[ERROR] Failed to execute serverinfo command:', error);
             const errorEmbed = new CustomEmbedBuilder(interaction.client).error(
                 'Server Info Error',
-                'Failed to retrieve server information. Please try again later.'
+                'An unexpected error occurred while retrieving server information. Please try again later.'
             );
             await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
         }
