@@ -9,7 +9,6 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('remindme')
         .setDescription('Sets a reminder for yourself.')
-        .setColor(0x5865F2)
         .addStringOption(option =>
             option.setName('time')
                 .setDescription('How long from now? (e.g., 10s, 5m, 1h, 3d)')
