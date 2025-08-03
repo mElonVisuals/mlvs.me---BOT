@@ -1,28 +1,31 @@
-// src/commands/admin.js
+/**
+ * Admin Command (example)
+ * This is an example of a simple admin command that checks for permissions.
+ */
 
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
 module.exports = {
     category: 'Admin',
-    // Add the ID of the role required to run this command.
-    // Replace 'YOUR_ROLE_ID' with the actual ID of the desired role.
-    permissions: ['1399901912182292481'], 
     
-    // Set to true if only the bot owner should be able to run this command globally.
-    ownerOnly: true,
-
     data: new SlashCommandBuilder()
         .setName('admin')
-        .setDescription('A command only accessible by admins and the bot owner.'),
+        .setDescription('Admin-only command to perform actions')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
-        // This command will only run if the permission checks in the main handler pass.
-        const successEmbed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle('Admin Command Executed!')
-            .setDescription(`This command can only be used by the bot owner and users with the required role.`)
-            .setTimestamp();
+        // Defer the reply at the start of the command execution
+        await interaction.deferReply({ ephemeral: true });
 
-        await interaction.reply({ embeds: [successEmbed] });
+        const adminEmbed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('Admin Actions')
+            .setDescription('Welcome, Administrator! You have access to the admin panel.')
+            .addFields({
+                name: 'Permissions',
+                value: 'This command can only be used by server administrators.'
+            });
+
+        await interaction.editReply({ embeds: [adminEmbed] });
     },
 };

@@ -85,7 +85,7 @@ module.exports = {
                 `The command \`/${interaction.commandName}\` does not exist or is not registered.`
             );
 
-            // Using reply() here because the interaction hasn't been deferred yet.
+            // The interaction hasn't been deferred, so we must use reply()
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
         }
@@ -93,11 +93,8 @@ module.exports = {
         try {
             console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.tag}`);
             
-            // Defer the reply right before executing the command.
-            // This prevents the "Interaction has already been acknowledged" error and command timeouts.
-            await interaction.deferReply({ ephemeral: true });
-            
-            // Execute the command
+            // The deferReply() call has been removed from here.
+            // Each command file must now handle its own deferral if needed.
             await command.execute(interaction);
         } catch (error) {
             console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
@@ -108,8 +105,12 @@ module.exports = {
                 'An unexpected error occurred while processing your command. Please try again later.'
             );
             
-            // Since we've already deferred the reply, we must use editReply() here.
-            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+            // Check if the interaction has been replied to or deferred
+            if (interaction.replied || interaction.deferred) {
+                await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+            } else {
+                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+            }
         }
     },
 };
