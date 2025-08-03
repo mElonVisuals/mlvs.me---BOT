@@ -14,7 +14,7 @@ module.exports = {
     async execute(client) {
         console.log('');
         console.log('╔═══════════════════════════════════════╗');
-        console.log('║            🤖 BOT READY! 🤖            ║');
+        console.log('║           🤖 BOT READY! 🤖            ║');
         console.log('╠═══════════════════════════════════════╣');
         console.log(`║ Bot: ${client.user.tag.padEnd(30)} ║`);
         console.log(`║ ID: ${client.user.id.padEnd(31)} ║`);
@@ -23,11 +23,38 @@ module.exports = {
         console.log('╚═══════════════════════════════════════╝');
         console.log('');
 
-        // Set bot activity/status
-        client.user.setActivity({
-            name: 'mlvs.me | /help',
-            type: ActivityType.Playing,
-        });
+        // --- Configuration for Dynamic Rich Presence ---
+        // Define an array of rich presence activities.
+        // The status will cycle through this list.
+        const activities = [
+            { name: 'your server grow 📈', type: ActivityType.Watching },
+            { name: 'with your code 🤖', type: ActivityType.Playing },
+            { name: `mlvs.me | /help`, type: ActivityType.Listening },
+            { name: 'the latest dev streams', type: ActivityType.Streaming, url: 'https://kick.com/trancefy' },
+        ];
+
+        let currentIndex = 0;
+
+        // Function to update the presence with the next activity
+        const updatePresence = () => {
+            const activity = activities[currentIndex];
+            client.user.setPresence({
+                activities: [activity],
+                status: 'online', // Can also be 'dnd', 'idle', or 'invisible'
+            });
+            
+            // Log the new presence to the console
+            console.log(`✨ Bot presence updated to: ${ActivityType[activity.type]} "${activity.name}"`);
+            
+            // Move to the next activity, looping back to the start if at the end of the array
+            currentIndex = (currentIndex + 1) % activities.length;
+        };
+
+        // Set the initial presence immediately
+        updatePresence();
+
+        // Use setInterval to change the presence at the specified interval (e.g., every 20 seconds)
+        setInterval(updatePresence, 20000);
 
         // Deploy commands on startup
         if (process.env.NODE_ENV === 'production') {
