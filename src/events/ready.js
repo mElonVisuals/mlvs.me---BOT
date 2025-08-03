@@ -30,7 +30,7 @@ module.exports = {
             { name: 'your server grow 📈', type: ActivityType.Watching },
             { name: 'with your code 🤖', type: ActivityType.Playing },
             { name: `mlvs.me | /help`, type: ActivityType.Listening },
-            { name: 'the latest dev streams', type: ActivityType.Streaming, url: 'https://kick.com/trancefy' },
+            { name: 'some music to listen to.', type: ActivityType.Streaming, url: 'https://kick.com/trancefy' },
         ];
 
         let currentIndex = 0;
