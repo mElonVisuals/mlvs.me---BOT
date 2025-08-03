@@ -1,58 +1,53 @@
-/**
- * @file botinfo.js
- * @description Provides information about the bot.
- * This version assumes the correct file paths for the 'utils' and 'embedBuilder' modules.
- * Please ensure that 'utils.js' and 'embedBuilder.js' exist in the 'src/utils' directory.
- */
-
-const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder } = require('../utils/embedBuilder.js');
-const { getBotUptime } = require('../utils/utils.js');
-const os = require('os');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('botinfo')
-        .setDescription('Displays information about the bot.'),
+        .setDescription('Get information about the bot'),
+    
     async execute(interaction) {
         try {
             const client = interaction.client;
+            const uptime = process.uptime();
             
-            // As per your interactionCreate event, the reply is already deferred.
-            // Awaiting interaction.deferReply() here would cause an error.
+            const embed = new EmbedBuilder()
+                .setTitle('Bot Information')
+                .setDescription(`Information about ${client.user.tag}`)
+                .addFields(
+                    { name: 'Bot Tag', value: client.user.tag, inline: true },
+                    { name: 'Bot ID', value: client.user.id, inline: true },
+                    { name: 'Servers', value: client.guilds.cache.size.toString(), inline: true },
+                    { name: 'Uptime', value: formatUptime(uptime), inline: true }
+                )
+                .setThumbnail(client.user.displayAvatarURL())
+                .setColor(0x00AE86)
+                .setTimestamp();
 
-            const botAvatar = client.user.displayAvatarURL({ dynamic: true });
-            const botUptime = getBotUptime(client.uptime);
-            const serverCount = client.guilds.cache.size;
-            const userCount = client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0);
-            const memoryUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
-            const cpuUsage = (os.loadavg()[0] || 'Unknown').toFixed(2);
-            
-            // Construct fields array to be passed to the embed method
-            const fields = [
-                { name: 'Developer', value: `<@${process.env.DEVELOPER_ID || 'N/A'}>`, inline: true },
-                { name: 'Servers', value: `${serverCount}`, inline: true },
-                { name: 'Users', value: `${userCount}`, inline: true },
-                { name: 'Uptime', value: botUptime, inline: false },
-                { name: 'Memory Usage', value: `${memoryUsage} MB`, inline: true },
-                { name: 'CPU Usage (1 min avg)', value: `${cpuUsage}%`, inline: true },
-                { name: 'Node.js Version', value: process.version, inline: true }
-            ];
-
-            // Use the info method with null for description, and pass the fields array
-            const embed = new CustomEmbedBuilder(client)
-                .info('Bot Information', null, fields)
-                .setThumbnail(botAvatar);
-
+            // Use editReply for deferred commands
             await interaction.editReply({ embeds: [embed] });
-
+            
         } catch (error) {
-            console.error('[ERROR] An error occurred while executing command botinfo:', error);
-            const errorEmbed = new CustomEmbedBuilder(interaction.client).error(
-                'Bot Info Error',
-                'An unexpected error occurred while retrieving bot information. Please try again later.'
-            );
-            await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+            console.error('[ERROR] Failed to execute botinfo command:', error);
+            
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('Error')
+                .setDescription('Failed to retrieve bot information.')
+                .setColor(0xFF0000);
+                
+            // Handle error response properly
+            if (interaction.deferred) {
+                await interaction.editReply({ embeds: [errorEmbed] });
+            } else {
+                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+            }
         }
-    }
+    },
 };
+
+function formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    return `${days}d ${hours}h ${minutes}m`;
+}
