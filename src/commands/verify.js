@@ -2,7 +2,7 @@
  * Verification Command
  * Sends a visually engaging embed with a "Verify" button for users to click.
  */
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 module.exports = {
     // Define the slash command
@@ -11,40 +11,51 @@ module.exports = {
         .setDescription('Sends the verification message with a button.'),
 
     async execute(interaction) {
-        // --- Create the new, animated verification embed ---
-        // Note: Replace the placeholder emoji IDs and custom image URL with your own.
-        // For animated emojis, use the format: <:emoji_name:emoji_id>
-        // For custom images, host them somewhere and use the direct URL.
+        // --- Create the improved verification embed ---
+        // Note: The custom image URLs and the bot's own avatar are used for a consistent theme.
+        // You'll still need to replace the placeholder emoji IDs with your own animated emoji.
         const verificationEmbed = new EmbedBuilder()
-            .setColor('#3498db') // A nice blue color
-            .setTitle('✨ Welcome! Please Verify to Continue ✨')
+            .setColor('#2ecc71') // A fresh, vibrant green to represent 'go' or 'verified'
+            .setTitle('✨ Welcome to mlvs.me! Please Verify to Continue ✨')
             .setDescription(
-                'Hello there! To gain full access to the server\'s channels and community, you must click the button below. ' +
-                'This helps us keep the server safe and bot-free! ' +
-                'Once you click, you will be granted the appropriate role. ' +
-                `\n\n<:animated_sparkles:123456789012345678> Click the button below to get started! `
+                `Hello <@${interaction.user.id}>! To gain full access to the server, you must click the verification button below.
+
+                This is a mandatory step to keep our community safe and bot-free. Once you verify, you will be granted the necessary roles and can begin exploring!`
             )
             .setAuthor({ name: 'Verification System', iconURL: interaction.client.user.displayAvatarURL() })
-            .setThumbnail('https://cdn.discordapp.com/attachments/1335734480253747297/1400244688061202553/mlvs.me-logo.png?ex=68908c3c&is=688f3abc&hm=f85d565a9822ddf01ea64f44d015f8815e22d6cfee5f0e71aa4720b229cfa3be&') // Placeholder for a custom icon
-            .setImage('https://cdn.discordapp.com/attachments/1369865705238954168/1401638507012821135/verify.png?ex=68910115&is=688faf95&hm=d46d4b4d29eaa31b8583db3ac5f5da5ce6b8b2406333b1ecb2197446ca37dbeb&') // Placeholder for a banner image
+            .setThumbnail('https://cdn.discordapp.com/attachments/1335734480253747297/1400244688061202553/mlvs.me-logo.png?ex=68908c3c&is=688f3abc&hm=f85d565a9822ddf01ea64f44d015f8815e22d6cfee5f0e71aa4720b229cfa3be&')
+            .setImage('https://cdn.discordapp.com/attachments/1369865705238954168/1401638507012821135/verify.png?ex=68910115&is=688faf95&hm=d46d4b4d29eaa31b8583db3ac5f5da5ce6b8b2406333b1ecb2197446ca37dbeb&')
+            .addFields(
+                {
+                    name: 'How to Verify:',
+                    value: `> <a:arrow1:1401639477675294891> Simply click the "Verify Me!" button below.
+> 🤖 Our system will automatically grant you access to all member channels.`,
+                    inline: false,
+                },
+                {
+                    name: 'Need Help?',
+                    value: `> 💬 If you encounter any issues, please contact a moderator.`,
+                    inline: false,
+                }
+            )
             .setTimestamp()
             .setFooter({ text: 'MLVS Bot | Security first!', iconURL: interaction.client.user.displayAvatarURL() });
 
         // --- Create the interactive button ---
         const verifyButton = new ButtonBuilder()
-            .setCustomId('verify-button') // This ID is what your interactionCreate.js listens for
+            .setCustomId('verify-button') // This ID must match the one your interactionCreate.js listens for
             .setLabel('Verify Me!')
-            .setEmoji('✔️') // You can use a custom emoji here as well
-            .setStyle(ButtonStyle.Success);
+            .setEmoji('<:verification:1401639982426226689>') // A key emoji to symbolize security/access
+            .setStyle(ButtonStyle.Success); // Green button for a successful action
 
         // Add the button to an ActionRow
         const actionRow = new ActionRowBuilder().addComponents(verifyButton);
 
-        // Reply with the embed and the button, making sure it's visible to everyone
+        // Reply with the embed and the button
         await interaction.reply({
             embeds: [verificationEmbed],
             components: [actionRow],
-            ephemeral: false, // Set to false so everyone can see the message and button
+            ephemeral: false, // Ensure the message is visible to everyone
         });
     },
 };
