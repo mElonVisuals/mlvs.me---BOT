@@ -4,7 +4,7 @@
  */
 
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const packageJson = require('./package.json'); // Assumes a package.json file exists for bot version
+const packageJson = require('../../package.json'); // Corrected path to package.json
 const os = require('os'); // Import the built-in Node.js 'os' module
 
 module.exports = {
