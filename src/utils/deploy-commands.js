@@ -1,56 +1,60 @@
-// src/utils/deploy-commands.js
+/**
+ * deploy-commands.js
+ * Run this file with 'node deploy-commands.js' to register your slash commands
+ * to a specific guild (server).
+ */
 
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 const { REST, Routes } = require('discord.js');
-const fs = require('fs').promises;
-const path = require('path');
 
-async function deployCommands() {
-    const commands = [];
-    const commandsPath = path.join(__dirname, '../commands');
+// Get the necessary IDs and token from your environment variables
+const { DISCORD_TOKEN, CLIENT_ID, GUILD_ID } = process.env;
 
-    try {
-        const commandFiles = await fs.readdir(commandsPath);
-        const jsFiles = commandFiles.filter(file => file.endsWith('.js'));
+// Check if all necessary environment variables are set
+if (!DISCORD_TOKEN || !CLIENT_ID || !GUILD_ID) {
+    console.error("❌ ERROR: Missing one or more environment variables. Ensure DISCORD_TOKEN, CLIENT_ID, and GUILD_ID are set in your .env file.");
+    process.exit(1);
+}
 
-        for (const file of jsFiles) {
-            const filePath = path.join(commandsPath, file);
-            const command = require(filePath);
-            
-            if ('data' in command && 'execute' in command) {
-                commands.push(command.data.toJSON());
-                console.log(`✅ Loaded command data: ${command.data.name}`);
-            } else {
-                console.log(`⚠️  Command at ${filePath} is missing required "data" or "execute" property.`);
-            }
-        }
+const commands = [];
+// Grab all the command files from the commands directory
+const foldersPath = path.join(__dirname, 'src', 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
 
-        const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-
-        console.log(`🚀 Started refreshing ${commands.length} application (/) commands.`);
-
-        if (process.env.GUILD_ID && process.env.NODE_ENV === 'development') {
-            const data = await rest.put(
-                Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-                { body: commands },
-            );
-            console.log(`✅ Successfully reloaded ${data.length} guild commands.`);
+for (const folder of commandFolders) {
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        // Set a new item in the Collection with the key as the command name and the value as the exported module
+        if ('data' in command && 'execute' in command) {
+            commands.push(command.data.toJSON());
         } else {
-            const data = await rest.put(
-                Routes.applicationCommands(process.env.CLIENT_ID),
-                { body: commands },
-            );
-            console.log(`✅ Successfully reloaded ${data.length} global commands.`);
+            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
         }
-
-    } catch (error) {
-        console.error('❌ Error deploying commands:', error);
-        process.exit(1);
     }
 }
 
-if (require.main === module) {
-    deployCommands();
-}
+// Construct and prepare an instance of the REST module
+const rest = new REST().setToken(DISCORD_TOKEN);
 
-module.exports = { deployCommands };
+// Deploy the commands
+(async () => {
+    try {
+        console.log(`🚀 Started refreshing ${commands.length} application (/) commands.`);
+
+        // The put method is used to fully refresh all commands in the guild with the current set
+        const data = await rest.put(
+            Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+            { body: commands },
+        );
+
+        console.log(`✅ Successfully reloaded ${data.length} application (/) commands.`);
+    } catch (error) {
+        // And of course, make sure you catch and log any errors!
+        console.error("❌ ERROR during command deployment:", error);
+    }
+})();
