@@ -1,6 +1,6 @@
 /**
  * Interaction Create Event Handler
- * Handles slash command interactions
+ * Handles slash command interactions and provides refined error handling.
  */
 
 const { Events } = require('discord.js');
@@ -20,7 +20,7 @@ module.exports = {
             const embedBuilder = new CustomEmbedBuilder(interaction.client);
             const errorEmbed = embedBuilder.error(
                 'Command Not Found',
-                `The command \`/${interaction.commandName}\` was not found. This might be a temporary issue.`
+                `The command \`/${interaction.commandName}\` was not found. It may be temporarily unavailable or has been removed.`
             );
 
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
@@ -36,21 +36,19 @@ module.exports = {
             const embedBuilder = new CustomEmbedBuilder(interaction.client);
             const errorEmbed = embedBuilder.error(
                 'Command Error',
-                'There was an error while executing this command. Please try again later.',
-                [
-                    {
-                        name: 'Error Details',
-                        value: `\`\`\`${error.message.slice(0, 1000)}\`\`\``,
-                        inline: false
-                    }
-                ]
+                'An unexpected error occurred while executing this command. Please try again later.'
             );
 
+            // Create a consistent reply options object
             const replyOptions = { embeds: [errorEmbed], ephemeral: true };
 
+            // Check if the interaction has already been replied to or deferred
+            // This prevents the bot from crashing and provides a graceful error message
             if (interaction.replied || interaction.deferred) {
+                // If it's a long-running command, follow up with the error
                 await interaction.followUp(replyOptions);
             } else {
+                // Otherwise, reply directly with the error message
                 await interaction.reply(replyOptions);
             }
         }
