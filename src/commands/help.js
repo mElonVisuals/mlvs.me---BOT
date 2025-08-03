@@ -1,7 +1,4 @@
-/**
- * Help Command
- * Displays information about available bot commands
- */
+// src/commands/help.js
 
 const { SlashCommandBuilder } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
@@ -14,37 +11,46 @@ module.exports = {
     async execute(interaction) {
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
         
-        // Get all commands from the client
+        // Get all commands from the client's collection
         const commands = interaction.client.commands;
-        
-        // Create command list
-        const commandList = commands.map(command => {
-            return `**/${command.data.name}** - ${command.data.description}`;
-        }).join('\n');
+
+        // Group commands by category
+        const categorizedCommands = new Map();
+        for (const [name, command] of commands) {
+            const category = command.category || 'Uncategorized';
+            if (!categorizedCommands.has(category)) {
+                categorizedCommands.set(category, []);
+            }
+            categorizedCommands.get(category).push(command);
+        }
 
         const helpEmbed = embedBuilder.info(
             'Bot Commands',
-            `Here are all the available commands for **${interaction.client.user.username}**:`,
-            [
-                {
-                    name: `${THEME.emojis.star} Available Commands`,
-                    value: commandList || 'No commands available.',
-                    inline: false
-                },
-                {
-                    name: '🔗 Quick Links',
-                    value: '[Support Server](https://discord.gg/wgpePdK8z9) • [Invite Bot](https://discord.com/api/oauth2/authorize?client_id=1393986208828489788&permissions=0&scope=bot%20applications.commands)',
-                    inline: false
-                },
-                {
-                    name: '💡 Need Help?',
-                    value: 'Use `/ping` to check if the bot is responding properly.',
-                    inline: false
-                }
-            ]
+            `Here are all the available commands for **${interaction.client.user.username}**:`
         )
-        .setThumbnail(interaction.client.user.displayAvatarURL())
-        .setImage('https://via.placeholder.com/400x100/7C3AED/FFFFFF?text=mlvs.me'); // Replace with your banner
+        .setThumbnail(interaction.client.user.displayAvatarURL());
+
+        // Create a new field for each category
+        for (const [category, cmds] of categorizedCommands.entries()) {
+            const commandList = cmds.map(command => {
+                // Ensure command.data and command.data.description are not null or undefined
+                const description = command.data?.description || 'No description provided.';
+                return `\`/${command.data?.name}\` - ${description}`;
+            }).join('\n');
+            
+            helpEmbed.addFields({
+                name: `📁 ${category} Commands`,
+                value: commandList,
+                inline: false
+            });
+        }
+        
+        // Add quick links as a separate field
+        helpEmbed.addFields({
+            name: '🔗 Quick Links',
+            value: '[Support Server](https://discord.gg/wgpePdK8z9) • [Invite Bot](https://discord.com/api/oauth2/authorize?client_id=1393986208828489788&permissions=0&scope=bot%20applications.commands)',
+            inline: false
+        });
 
         await interaction.reply({ embeds: [helpEmbed] });
     },

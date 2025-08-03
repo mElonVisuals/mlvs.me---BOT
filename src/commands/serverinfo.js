@@ -1,12 +1,12 @@
-/**
- * Server Info Command
- * Displays detailed information about the current Discord server
- */
+// src/commands/serverinfo.js
 
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
 
 module.exports = {
+    // Add a category property
+    category: 'Utility',
+
     data: new SlashCommandBuilder()
         .setName('serverinfo')
         .setDescription('Display detailed information about this server'),
@@ -15,78 +15,50 @@ module.exports = {
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
         const guild = interaction.guild;
 
-        // Get server statistics
         const totalMembers = guild.memberCount;
         const botCount = guild.members.cache.filter(member => member.user.bot).size;
         const humanCount = totalMembers - botCount;
 
-        // Get channel counts
         const textChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText).size;
         const voiceChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).size;
         const categories = guild.channels.cache.filter(c => c.type === ChannelType.GuildCategory).size;
         const totalChannels = guild.channels.cache.size;
 
-        // Get role count (excluding @everyone)
         const roleCount = guild.roles.cache.size - 1;
 
-        // Get boost information
         const boostLevel = guild.premiumTier;
         const boostCount = guild.premiumSubscriptionCount || 0;
 
-        // Get verification level
-        const verificationLevels = {
-            0: 'None',
-            1: 'Low',
-            2: 'Medium',
-            3: 'High',
-            4: 'Very High'
-        };
-
-        // Get explicit content filter level
-        const contentFilterLevels = {
-            0: 'Disabled',
-            1: 'Members without roles',
-            2: 'All members'
-        };
-
-        // Calculate server age
+        const verificationLevels = [ 'None', 'Low', 'Medium', 'High', 'Highest' ];
+        const contentFilterLevels = ['Off', 'No Role', 'Everyone'];
+        
         const createdAt = guild.createdAt;
         const serverAge = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
 
         const serverInfoEmbed = embedBuilder.info(
-            `${guild.name} Server Information`,
-            `Here's everything you need to know about **${guild.name}**`,
+            `${THEME.emojis.star} Server Info for ${guild.name}`,
+            `A detailed overview of the server.`
+        )
+        .addFields(
             [
                 {
                     name: '👥 Members',
-                    value: [
-                        `**Total:** ${totalMembers.toLocaleString()}`,
-                        `**Humans:** ${humanCount.toLocaleString()}`,
-                        `**Bots:** ${botCount.toLocaleString()}`
-                    ].join('\n'),
+                    value: `**Total:** ${totalMembers}\n**Humans:** ${humanCount}\n**Bots:** ${botCount}`,
                     inline: true
                 },
                 {
-                    name: '📝 Channels',
-                    value: [
-                        `**Total:** ${totalChannels}`,
-                        `**Text:** ${textChannels}`,
-                        `**Voice:** ${voiceChannels}`,
-                        `**Categories:** ${categories}`
-                    ].join('\n'),
+                    name: '💬 Channels',
+                    value: `**Text:** ${textChannels}\n**Voice:** ${voiceChannels}\n**Categories:** ${categories}\n**Total:** ${totalChannels}`,
+                    inline: true
+                },
+                {
+                    name: '🚀 Server Boost',
+                    value: `**Level:** ${boostLevel}\n**Boosts:** ${boostCount}`,
                     inline: true
                 },
                 {
                     name: '🎭 Roles',
-                    value: `**${roleCount}** roles`,
-                    inline: true
-                },
-                {
-                    name: '🚀 Nitro Boosts',
-                    value: [
-                        `**Level:** ${boostLevel}`,
-                        `**Boosts:** ${boostCount}`
-                    ].join('\n'),
+                    value: `**Total:** ${roleCount}`,
                     inline: true
                 },
                 {
@@ -111,7 +83,6 @@ module.exports = {
         .setThumbnail(guild.iconURL({ dynamic: true, size: 1024 }) || null)
         .setImage(guild.bannerURL({ dynamic: true, size: 1024 }) || null);
 
-        // Add server features if any
         if (guild.features.length > 0) {
             const features = guild.features.map(feature => 
                 feature.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())

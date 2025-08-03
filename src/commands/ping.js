@@ -1,12 +1,12 @@
-/**
- * Ping Command
- * A simple command to test bot responsiveness and display latency
- */
+// src/commands/ping.js
 
 const { SlashCommandBuilder } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
 
 module.exports = {
+    // Add a category property to the command module
+    category: 'Utility', 
+    
     data: new SlashCommandBuilder()
         .setName('ping')
         .setDescription('Check the bot\'s latency and responsiveness'),
@@ -14,23 +14,19 @@ module.exports = {
     async execute(interaction) {
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
 
-        // Create initial loading embed
         const loadingEmbed = embedBuilder.loading(
             'Calculating Ping...',
             'Please wait while I measure the response time.'
         );
 
-        // Reply with loading embed and measure response time
         const sent = await interaction.reply({ 
             embeds: [loadingEmbed], 
             fetchReply: true 
         });
 
-        // Calculate latencies
         const roundtripLatency = sent.createdTimestamp - interaction.createdTimestamp;
         const websocketLatency = Math.round(interaction.client.ws.ping);
 
-        // Determine ping quality and emoji
         let pingQuality = 'Excellent';
         let pingColor = 'success';
         let pingEmoji = THEME.emojis.success;
@@ -45,7 +41,6 @@ module.exports = {
             pingEmoji = '⚠️';
         }
 
-        // Create final response embed
         const resultEmbed = embedBuilder.createBaseEmbed(pingColor)
             .setTitle(`${THEME.emojis.ping} Pong!`)
             .setDescription(`Bot is online and responding. Connection quality: **${pingQuality}**`)
@@ -68,7 +63,6 @@ module.exports = {
             ])
             .setThumbnail(interaction.client.user.displayAvatarURL());
 
-        // Edit the original response with the results
         await interaction.editReply({ embeds: [resultEmbed] });
     },
 };

@@ -1,12 +1,12 @@
-/**
- * Clear Command
- * Bulk delete messages from a channel
- */
+// src/commands/clear.js
 
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
 
 module.exports = {
+    // Add a category property
+    category: 'Moderation',
+
     data: new SlashCommandBuilder()
         .setName('clear')
         .setDescription('Delete a specified number of messages from the channel')
@@ -38,119 +38,38 @@ module.exports = {
         const targetUser = interaction.options.getUser('target');
         const reason = interaction.options.getString('reason') || 'No reason provided';
 
-        // Check if bot has required permissions
-        if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            const errorEmbed = embedBuilder.error(
-                'Missing Permissions',
-                'I need the **Manage Messages** permission to delete messages.'
-            );
-            return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-        }
-
-        // Check if user has required permissions
-        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
-            const errorEmbed = embedBuilder.error(
-                'Insufficient Permissions',
-                'You need the **Manage Messages** permission to use this command.'
-            );
-            return interaction.reply({ embeds: [errorEmbed], ephemeral: true });
-        }
-
         try {
-            // Show loading message
-            const loadingEmbed = embedBuilder.loading(
-                'Clearing Messages...',
-                `Deleting ${amount} message${amount === 1 ? '' : 's'}${targetUser ? ` from ${targetUser.username}` : ''}...`
-            );
+            // Defer the reply to prevent a timeout
+            await interaction.deferReply({ ephemeral: true });
 
-            await interaction.reply({ embeds: [loadingEmbed], ephemeral: true });
-
-            // Fetch messages to delete
-            let messagesToDelete;
-            
+            let messages;
             if (targetUser) {
-                // Fetch more messages to filter by user
-                const fetchLimit = Math.min(amount * 3, 100); // Fetch more to account for filtering
-                const fetched = await interaction.channel.messages.fetch({ limit: fetchLimit });
-                
-                // Filter messages by target user
-                messagesToDelete = fetched.filter(msg => 
-                    msg.author.id === targetUser.id && 
-                    Date.now() - msg.createdTimestamp < 14 * 24 * 60 * 60 * 1000 // Less than 14 days old
-                );
+                // Fetch messages and filter by target user
+                messages = await interaction.channel.messages.fetch({ limit: 100 });
+                const userMessages = messages.filter(m => m.author.id === targetUser.id).first(amount);
 
-                // Limit to requested amount
-                messagesToDelete = messagesToDelete.first(amount);
+                if (userMessages.length === 0) {
+                    const noMessagesEmbed = embedBuilder.warning(
+                        'No Messages Found',
+                        `I couldn't find any recent messages from <@${targetUser.id}> in this channel.`
+                    );
+                    return interaction.editReply({ embeds: [noMessagesEmbed] });
+                }
+
+                await interaction.channel.bulkDelete(userMessages, true);
             } else {
-                // Fetch messages normally
-                messagesToDelete = await interaction.channel.messages.fetch({ limit: amount });
-                
-                // Filter out messages older than 14 days (Discord API limitation)
-                messagesToDelete = messagesToDelete.filter(msg => 
-                    Date.now() - msg.createdTimestamp < 14 * 24 * 60 * 60 * 1000
-                );
+                // Bulk delete messages
+                await interaction.channel.bulkDelete(amount, true);
             }
-
-            if (messagesToDelete.size === 0) {
-                const noMessagesEmbed = embedBuilder.warning(
-                    'No Messages Found',
-                    targetUser 
-                        ? `No recent messages found from ${targetUser.username} in this channel.`
-                        : 'No messages found to delete. Messages older than 14 days cannot be bulk deleted.'
-                );
-                return interaction.editReply({ embeds: [noMessagesEmbed] });
-            }
-
-            // Delete messages
-            let deletedCount = 0;
             
-            if (messagesToDelete.size === 1) {
-                // Single message deletion
-                await messagesToDelete.first().delete();
-                deletedCount = 1;
-            } else {
-                // Bulk delete
-                const deleted = await interaction.channel.bulkDelete(messagesToDelete, true);
-                deletedCount = deleted.size;
-            }
-
-            // Success response
             const successEmbed = embedBuilder.success(
                 'Messages Cleared!',
-                `Successfully deleted **${deletedCount}** message${deletedCount === 1 ? '' : 's'}${targetUser ? ` from ${targetUser.username}` : ''}.`,
-                [
-                    {
-                        name: '📊 Details',
-                        value: [
-                            `**Channel:** ${interaction.channel}`,
-                            `**Moderator:** ${interaction.user}`,
-                            `**Reason:** ${reason}`,
-                            targetUser ? `**Target User:** ${targetUser}` : null
-                        ].filter(Boolean).join('\n'),
-                        inline: false
-                    }
-                ]
+                `Successfully deleted **${amount}** messages${targetUser ? ` from <@${targetUser.id}>` : ''}.`
+            ).addFields(
+                { name: 'Reason', value: `\`\`\`${reason}\`\`\`` }
             );
 
             await interaction.editReply({ embeds: [successEmbed] });
-
-            // Log to console
-            console.log(`🗑️ [CLEAR] ${interaction.user.tag} deleted ${deletedCount} messages in #${interaction.channel.name}${targetUser ? ` from ${targetUser.tag}` : ''}`);
-
-            // Optional: Send a brief confirmation message that auto-deletes
-            const confirmMessage = await interaction.followUp({
-                content: `✅ Cleared ${deletedCount} message${deletedCount === 1 ? '' : 's'}.`,
-                ephemeral: false
-            });
-
-            // Delete the confirmation message after 5 seconds
-            setTimeout(async () => {
-                try {
-                    await confirmMessage.delete();
-                } catch (error) {
-                    // Message might already be deleted, ignore error
-                }
-            }, 5000);
 
         } catch (error) {
             console.error('❌ Error in clear command:', error);

@@ -1,22 +1,25 @@
 // src/commands/uptime.js
+
 const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder'); // Use your existing import structure
-const prettyMs = require('pretty-ms'); // You'll need to install this package: npm install pretty-ms
+const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
+const prettyMs = require('pretty-ms');
 
 module.exports = {
+    // Add a category property
+    category: 'Utility',
+
     data: new SlashCommandBuilder()
         .setName('uptime')
         .setDescription('Displays how long the bot has been running.'),
     async execute(interaction) {
-        // Instantiate CustomEmbedBuilder just like in serverinfo.js
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
 
-        const uptimeInMs = interaction.client.uptime; // Uptime is in milliseconds
+        const uptimeInMs = interaction.client.uptime;
         const readableUptime = prettyMs(uptimeInMs, { verbose: true, secondsDecimalDigits: 0 });
 
-        const embed = embedBuilder.info( // Using info embed type
+        const embed = embedBuilder.info(
             'Bot Uptime',
-            `${THEME.emojis.star} I have been online for: \`${readableUptime}\`` // Using a themed emoji
+            `${THEME.emojis.star} I have been online for: \`${readableUptime}\``
         );
 
         await interaction.reply({ embeds: [embed] });

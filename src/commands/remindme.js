@@ -1,9 +1,13 @@
 // src/commands/remindme.js
+
 const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder'); // Use your existing import structure
-const ms = require('ms'); // You'll need to install this package: npm install ms
+const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
+const ms = require('ms');
 
 module.exports = {
+    // Add a category property
+    category: 'General',
+
     data: new SlashCommandBuilder()
         .setName('remindme')
         .setDescription('Sets a reminder for yourself.')
@@ -16,10 +20,9 @@ module.exports = {
                 .setDescription('What do you want to be reminded about?')
                 .setRequired(true)),
     async execute(interaction) {
-        // Instantiate CustomEmbedBuilder just like in serverinfo.js
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
 
-        await interaction.deferReply({ ephemeral: true }); // Defer and make it ephemeral
+        await interaction.deferReply({ ephemeral: true });
 
         const timeString = interaction.options.getString('time');
         const reminderMessage = interaction.options.getString('message');
@@ -28,25 +31,18 @@ module.exports = {
 
         const timeInMs = ms(timeString);
 
-        if (!timeInMs || timeInMs < 5000) { // Minimum 5 seconds
+        if (!timeInMs || timeInMs < 5000) {
             const errorEmbed = embedBuilder.error(
-                'Invalid Time Provided',
-                'Please provide a valid time (e.g., `10s`, `5m`, `1h`, `3d`). Minimum reminder time is 5 seconds.'
+                'Invalid Time',
+                'Please provide a valid time greater than 5 seconds (e.g., `10s`, `5m`, `1h`).'
             );
-            return interaction.editReply({ embeds: [errorEmbed] });
+            await interaction.editReply({ embeds: [errorEmbed] });
+            return;
         }
 
-        if (timeInMs > ms('30d')) { // Maximum 30 days to avoid too many long-running timers
-            const errorEmbed = embedBuilder.error(
-                'Time Limit Exceeded',
-                'Reminders cannot be set for longer than 30 days.'
-            );
-            return interaction.editReply({ embeds: [errorEmbed] });
-        }
+        const reminderTimestamp = Math.floor((Date.now() + timeInMs) / 1000);
 
-        const reminderTimestamp = Math.floor((Date.now() + timeInMs) / 1000); // Unix timestamp for Discord formatting
-
-        const successEmbed = embedBuilder.success( // Using success embed type
+        const successEmbed = embedBuilder.success(
             'Reminder Set!',
             `I will remind you <t:${reminderTimestamp}:R> in this channel.`
         ).addFields(
@@ -55,27 +51,23 @@ module.exports = {
 
         await interaction.editReply({ embeds: [successEmbed] });
 
-        // Set the timeout for the reminder
         setTimeout(async () => {
             try {
-                // Fetch the user and channel again to ensure they are still available
                 const user = await interaction.client.users.fetch(userId);
                 const channel = await interaction.client.channels.fetch(channelId);
 
                 if (user && channel) {
-                    const reminderEmbed = embedBuilder.info( // Using info embed type
+                    const reminderEmbed = embedBuilder.info(
                         'Reminder!',
                         `Hey ${user}! You asked me to remind you about:`
                     ).addFields(
                         { name: 'Your Message', value: `\`\`\`${reminderMessage}\`\`\`` }
                     );
 
-                    // Send the reminder message to the original channel
                     await channel.send({ content: `<@${userId}>`, embeds: [reminderEmbed] });
                 }
             } catch (error) {
                 console.error(`Error sending reminder to ${userId} in ${channelId}:`, error);
-                // If the channel or user is gone, we can't send the reminder.
             }
         }, timeInMs);
     },
