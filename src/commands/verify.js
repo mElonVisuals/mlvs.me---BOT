@@ -16,7 +16,7 @@ module.exports = {
         // You'll still need to replace the placeholder emoji IDs with your own animated emoji.
         const verificationEmbed = new EmbedBuilder()
             .setColor('#2ecc71') // A fresh, vibrant green to represent 'go' or 'verified'
-            .setTitle('✨ Welcome to mlvs.me! Please Verify to Continue ✨')
+            .setTitle('<a:thisr:1401642268992999546>  Welcome to mlvs.me! Please Verify to Continue <a:thisl:1401642267759874190>')
             .setDescription(
                 `Hello <@${interaction.user.id}>! To gain full access to the server, you must click the verification button below.
 
@@ -29,12 +29,12 @@ module.exports = {
                 {
                     name: 'How to Verify:',
                     value: `> <a:arrow1:1401639477675294891> Simply click the "Verify Me!" button below.
-> 🤖 Our system will automatically grant you access to all member channels.`,
+> <:bot:1401641253141086219> Our system will automatically grant you access to all member channels.`,
                     inline: false,
                 },
                 {
                     name: 'Need Help?',
-                    value: `> 💬 If you encounter any issues, please contact a moderator.`,
+                    value: `> <:Staff:1401641828675227748> If you encounter any issues, please contact our staff team.`,
                     inline: false,
                 }
             )
