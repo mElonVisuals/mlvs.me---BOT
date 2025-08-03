@@ -25,8 +25,8 @@ module.exports = {
                 `\n\n<:animated_sparkles:123456789012345678> Click the button below to get started! `
             )
             .setAuthor({ name: 'Verification System', iconURL: interaction.client.user.displayAvatarURL() })
-            .setThumbnail('https://placehold.co/100x100/3498db/ffffff?text=Verify') // Placeholder for a custom icon
-            .setImage('https://placehold.co/600x200/3498db/ffffff?text=Welcome+to+the+Server!') // Placeholder for a banner image
+            .setThumbnail('https://cdn.discordapp.com/attachments/1335734480253747297/1400244688061202553/mlvs.me-logo.png?ex=68908c3c&is=688f3abc&hm=f85d565a9822ddf01ea64f44d015f8815e22d6cfee5f0e71aa4720b229cfa3be&') // Placeholder for a custom icon
+            .setImage('https://cdn.discordapp.com/attachments/1369865705238954168/1401638507012821135/verify.png?ex=68910115&is=688faf95&hm=d46d4b4d29eaa31b8583db3ac5f5da5ce6b8b2406333b1ecb2197446ca37dbeb&') // Placeholder for a banner image
             .setTimestamp()
             .setFooter({ text: 'MLVS Bot | Security first!', iconURL: interaction.client.user.displayAvatarURL() });
 
