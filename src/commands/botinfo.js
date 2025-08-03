@@ -39,13 +39,6 @@ module.exports = {
         const uptime = formatUptime(client.uptime);
         const owner = client.application.owner;
 
-        // Get system information from the os module
-        const totalMemory = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2); // Convert bytes to GB
-        const freeMemory = (os.freemem() / 1024 / 1024 / 1024).toFixed(2); // Convert bytes to GB
-        const cpuCores = os.cpus().length;
-        const cpuModel = os.cpus()[0].model;
-        const platform = os.platform();
-
         // Create the new embed
         const botInfoEmbed = new EmbedBuilder()
             .setColor(0x2b2d31) // Dark Discord-like gray
@@ -53,7 +46,7 @@ module.exports = {
                 name: `${client.user.username} • /bot info`,
                 iconURL: client.user.displayAvatarURL()
             })
-            .setThumbnail('https://cdn.discordapp.com/attachments/1335734480253747297/1397732597852799059/Dark_Purple_Modern_Letter_M_Logo.png?ex=6890a32b&is=688f51ab&hm=986affad4144e1b5e57b69e93305c3e7a92d39f4cdd26fb8acc50f90fc48db4d&') // Bot's custom logo
+            .setThumbnail('https://cdn.discordapp.com/attachments/1335734480253747297/1400244688061202553/mlvs.me-logo.png?ex=68908c3c&is=688f3abc&hm=f85d565a9822ddf01ea64f44d015f8815e22d6cfee5f0e71aa4720b229cfa3be&') // Bot's custom logo
             .setTimestamp()
             .setFooter({
                 text: `mlvs.me •`, // Custom footer text from the image
@@ -75,21 +68,6 @@ module.exports = {
             }
         ];
         
-        // ====================================================================
-        //                       Hardware Section
-        // ====================================================================
-        const hardwareFields = [
-            { name: '**- Hardware**', value: '\u200b', inline: false },
-            {
-                name: '\u200b',
-                value: `• OS: \`${platform}\`\n` +
-                       `• CPU: \`${cpuModel}\`\n` +
-                       `• Cores: \`${cpuCores}\`\n` +
-                       `• RAM: \`${totalMemory}GB\` (Used: \`${(totalMemory - freeMemory).toFixed(2)}GB\`)\n` +
-                       `• Free RAM: \`${freeMemory}GB\``,
-                inline: false
-            }
-        ];
 
         // ====================================================================
         //                       System Section
