@@ -46,7 +46,7 @@ module.exports = {
         // Create the new embed
         const serverInfoEmbed = new EmbedBuilder()
             // Set the color, title, thumbnail, and footer to match your requested style
-            .setColor(0x2b2d31) // A dark, Discord-like gray
+            .setColor(0x5865F2) // A dark, Discord-like gray
             .setTitle(`Server Info - ${guild.name}`)
             .setThumbnail(guild.iconURL({ dynamic: true, size: 1024 }))
             .setTimestamp()

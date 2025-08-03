@@ -18,7 +18,7 @@ module.exports = {
     async execute(interaction) {
         // This command will only run if the permission checks in the main handler pass.
         const successEmbed = new EmbedBuilder()
-            .setColor(0x57F287)
+            .setColor(0x5865F2)
             .setTitle('Admin Command Executed!')
             .setDescription(`This command can only be used by the bot owner and users with the required role.`)
             .setTimestamp();
