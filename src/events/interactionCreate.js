@@ -1,15 +1,74 @@
 /**
  * Interaction Create Event Handler
- * Handles slash command interactions and provides refined error handling.
+ * Handles slash command interactions and button clicks for the verification system.
  */
-
 const { Events } = require('discord.js');
 const { CustomEmbedBuilder } = require('../utils/embedBuilder');
+
+// IMPORTANT: Replace this with the ID of the role you want to give to verified users.
+// You can get a role's ID by right-clicking the role in Discord and selecting "Copy ID".
+// Make sure the bot's role is positioned ABOVE this role in the server's role list.
+const VERIFICATION_ROLE_ID = '1399901918481879212';
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
-        // Only handle chat input commands (slash commands)
+
+        // --- Handle Button Interactions ---
+        if (interaction.isButton()) {
+            // Check if the button click is from our verification button
+            if (interaction.customId === 'verify-button') {
+                console.log(`🔒 Verification button clicked by ${interaction.user.tag}`);
+
+                // Defer the update immediately to prevent a timeout error.
+                // This tells Discord "I'm working on it" and prevents the "interaction failed" message.
+                await interaction.deferUpdate();
+
+                const member = interaction.guild.members.cache.get(interaction.user.id);
+                const role = interaction.guild.roles.cache.get(VERIFICATION_ROLE_ID);
+
+                // Check for errors before attempting to add the role
+                if (!member) {
+                    console.error('❌ Could not find the member who clicked the button.');
+                    return;
+                }
+                if (!role) {
+                    console.error(`❌ Could not find the role with ID: ${VERIFICATION_ROLE_ID}`);
+                    await interaction.followUp({ content: 'Error: The verification role could not be found. Please contact a staff member.', ephemeral: true });
+                    return;
+                }
+
+                // Check if the member already has the role
+                if (member.roles.cache.has(VERIFICATION_ROLE_ID)) {
+                    console.log(`✅ ${interaction.user.tag} is already verified.`);
+                    await interaction.followUp({ content: 'You are already verified!', ephemeral: true });
+                    return;
+                }
+
+                try {
+                    // Add the verification role to the user
+                    await member.roles.add(role);
+                    console.log(`✅ Successfully verified ${interaction.user.tag} and added the role.`);
+                    
+                    const successEmbed = new CustomEmbedBuilder(interaction.client).success(
+                        'Verification Complete!',
+                        'You have been successfully verified and now have full access to the server!'
+                    );
+                    
+                    // Reply to the user with a success message
+                    await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
+
+                } catch (error) {
+                    console.error(`❌ Failed to add role to ${interaction.user.tag}:`, error);
+                    await interaction.followUp({ content: 'An error occurred while trying to verify you. Please contact a staff member.', ephemeral: true });
+                }
+            }
+            return; // Exit the function after handling the button interaction
+        }
+
+
+        // --- Handle Slash Command Interactions (existing code) ---
+        // This part of the code remains the same to handle all other slash commands
         if (!interaction.isChatInputCommand()) return;
 
         const command = interaction.client.commands.get(interaction.commandName);
@@ -39,16 +98,11 @@ module.exports = {
                 'An unexpected error occurred while executing this command. Please try again later.'
             );
 
-            // Create a consistent reply options object
             const replyOptions = { embeds: [errorEmbed], ephemeral: true };
 
-            // Check if the interaction has already been replied to or deferred
-            // This prevents the bot from crashing and provides a graceful error message
             if (interaction.replied || interaction.deferred) {
-                // If it's a long-running command, follow up with the error
                 await interaction.followUp(replyOptions);
             } else {
-                // Otherwise, reply directly with the error message
                 await interaction.reply(replyOptions);
             }
         }
