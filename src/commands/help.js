@@ -1,52 +1,61 @@
-/**
- * Help Command
- * Displays information about available bot commands
- */
+// src/commands/help.js
 
-const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
+    category: 'Utility', // This command also has a category
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Display information about available commands'),
 
     async execute(interaction) {
-        const embedBuilder = new CustomEmbedBuilder(interaction.client);
-        
-        // Get all commands from the client
-        const commands = interaction.client.commands;
-        
-        // Create command list
-        const commandList = commands.map(command => {
-            return `**/${command.data.name}** - ${command.data.description}`;
-        }).join('\n');
+        const { client } = interaction;
 
-        const helpEmbed = embedBuilder.info(
-            'Bot Commands',
-            `Here are all the available commands for **${interaction.client.user.username}**:`,
-            [
-                {
-                    name: `${THEME.emojis.star} Available Commands`,
-                    value: commandList || 'No commands available.',
-                    inline: false
-                },
-                {
-                    name: '🔗 Quick Links',
-                    value: '[Support Server](https://discord.gg/wgpePdK8z9) • [Invite Bot](https://discord.com/api/oauth2/authorize?client_id=1393986208828489788&permissions=0&scope=bot%20applications.commands)',
-                    inline: false
-                },
-                {
-                    name: '💡 Need Help?',
-                    value: 'Use our support system to get in contact with staff to help you with your issue.',
-                    inline: false
-                }
-            ]
-        )
-        // Use the new bot icon placeholder
-        .setThumbnail(interaction.client.user.displayAvatarURL() || embedBuilder.getPlaceholder('botIcon'))
-        // Use the new banner placeholder
-        .setImage(embedBuilder.getPlaceholder('banner'));
+        // Create an object to store commands grouped by category
+        const categorizedCommands = new Map();
+
+        // Iterate through all commands and group them
+        for (const [name, command] of client.commands) {
+            const category = command.category || 'Uncategorized';
+            if (!categorizedCommands.has(category)) {
+                categorizedCommands.set(category, []);
+            }
+            categorizedCommands.get(category).push(command);
+        }
+
+        // Create the main help embed
+        const helpEmbed = new EmbedBuilder()
+            .setColor(0x5865F2) // Use a consistent, modern color
+            .setTitle(`🤖 ${client.user.username} Commands`)
+            .setDescription('Here is a list of all available commands, organized by category.')
+            .setThumbnail(client.user.displayAvatarURL());
+
+        // Add a field for each category
+        for (const [category, commands] of categorizedCommands) {
+            const commandList = commands
+                .map(cmd => `\`/${cmd.data.name}\` - ${cmd.data.description}`)
+                .join('\n');
+
+            helpEmbed.addFields({
+                name: `__${category}__`,
+                value: commandList,
+                inline: false
+            });
+        }
+
+        // Add quick links and a footer
+        helpEmbed.addFields(
+            {
+                name: '🔗 Quick Links',
+                value: '[Support Server](https://discord.gg/wgpePdK8z9) • [Invite Bot](https://discord.com/api/oauth2/authorize?client_id=1393986208828489788&permissions=0&scope=bot%20applications.commands)',
+                inline: false
+            },
+        );
+
+        helpEmbed.setFooter({
+            text: `Requested by ${interaction.user.tag}`,
+            iconURL: interaction.user.displayAvatarURL()
+        });
 
         await interaction.reply({ embeds: [helpEmbed] });
     },

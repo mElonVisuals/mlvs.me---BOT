@@ -52,6 +52,7 @@ module.exports = {
 
         const targetChannel = interaction.options.getChannel('channel');
         const announcementTitle = interaction.options.getString('title');
+        // Get the raw message from the slash command input
         const announcementMessage = interaction.options.getString('message');
         const announcementImage = interaction.options.getString('image');
         const announcementThumbnail = interaction.options.getString('thumbnail');
@@ -60,9 +61,13 @@ module.exports = {
         const announcementFooterText = interaction.options.getString('footer');
 
         try {
+            // New: Replace the literal `\n` string with an actual newline character.
+            // The user must type `\n` in the Discord command input for this to work.
+            const formattedMessage = announcementMessage.replace(/\\n/g, '\n');
+
             const announcementEmbed = embedBuilder.createBaseEmbed()
                 .setTitle(announcementTitle)
-                .setDescription(announcementMessage);
+                .setDescription(formattedMessage); // Use the formatted message here
 
             if (announcementImage) announcementEmbed.setImage(announcementImage);
             if (announcementThumbnail) announcementEmbed.setThumbnail(announcementThumbnail);

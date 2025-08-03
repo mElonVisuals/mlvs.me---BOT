@@ -1,116 +1,51 @@
-/**
- * Bot Info Command
- * Displays detailed information about the bot itself, including system specs
- */
+// src/commands/botinfo.js
 
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const packageJson = require('../../package.json'); // Corrected path to package.json
-const os = require('os'); // Import the built-in Node.js 'os' module
+// Import necessary classes from discord.js
+const { SlashCommandBuilder, PermissionsBitField, EmbedBuilder } = require('discord.js');
 
 module.exports = {
-    // Command data
+    // Add a category property
+    category: 'Information',
+
+    // Define the slash command data
     data: new SlashCommandBuilder()
         .setName('botinfo')
-        .setDescription('Display detailed information about the bot'),
+        .setDescription('Displays information about the bot.'),
 
-    // Execute function
+    // The function to execute when the command is called
     async execute(interaction) {
-        // Defer the reply to give the bot time to process the command
+        // Defer the reply to give the bot time to gather the info
         await interaction.deferReply();
 
-        const client = interaction.client;
-
-        // Function to format uptime in "Xd Xh Xm Xs" format
-        const formatUptime = (ms) => {
-            const seconds = Math.floor((ms / 1000) % 60);
-            const minutes = Math.floor((ms / (1000 * 60)) % 60);
-            const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
-            const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-
-            const parts = [];
-            if (days > 0) parts.push(`${days}d`);
-            if (hours > 0) parts.push(`${hours}h`);
-            if (minutes > 0) parts.push(`${minutes}m`);
-            if (seconds > 0) parts.push(`${seconds}s`);
-
-            return parts.length > 0 ? parts.join(' ') : 'less than 1s';
-        };
-
-        const uptime = formatUptime(client.uptime);
-        const owner = client.application.owner;
-
-        // Create the new embed
-        const botInfoEmbed = new EmbedBuilder()
-            .setColor(0x2b2d31) // Dark Discord-like gray
-            .setAuthor({
-                name: `${client.user.username} • /bot info`,
-                iconURL: client.user.displayAvatarURL()
-            })
-            .setThumbnail('https://cdn.discordapp.com/attachments/1335734480253747297/1400244688061202553/mlvs.me-logo.png?ex=68908c3c&is=688f3abc&hm=f85d565a9822ddf01ea64f44d015f8815e22d6cfee5f0e71aa4720b229cfa3be&') // Bot's custom logo
-            .setTimestamp()
-            .setFooter({
-                text: `mlvs.me •`, // Custom footer text from the image
-                iconURL: client.user.displayAvatarURL()
-            });
-
-        // ====================================================================
-        //                       Software Section
-        // ====================================================================
-        const softwareFields = [
-            { name: '**- Software**', value: '\u200b', inline: false },
-            {
-                name: 'Versions:',
-                value: `• Version Bot: \`${packageJson.version || '1.0.0'}\`\n` +
-                       `• Version Discord.js: \`v${require('discord.js').version}\`\n` +
-                       `• Version Node.js: \`${process.version}\`\n` +
-                       `• Language version: \`EN-GB (supported)\``,
-                inline: false
-            }
-        ];
+        // Get the bot's uptime in milliseconds
+        const uptimeInSeconds = Math.floor(interaction.client.uptime / 1000);
+        const days = Math.floor(uptimeInSeconds / (3600 * 24));
+        const hours = Math.floor((uptimeInSeconds % (3600 * 24)) / 3600);
+        const minutes = Math.floor((uptimeInSeconds % 3600) / 60);
+        const seconds = Math.floor(uptimeInSeconds % 60);
         
+        // Format the uptime string
+        const uptimeString = `${days}d, ${hours}h, ${minutes}m, ${seconds}s`;
 
-        // ====================================================================
-        //                       System Section
-        // ====================================================================
-        const systemFields = [
-            { name: '**- System**', value: '\u200b', inline: false },
-            {
-                name: '\u200b',
-                value: `• Uptime: \`${uptime}\`\n` +
-                       `• Bot Latency: \`${Math.round(client.ws.ping)}ms\`\n` +
-                       `• Database Latency: \`34ms\`\n` +
-                       `• Active Shards: \`1/1\``,
-                inline: false
-            }
-        ];
+        // Create the embed to display the bot information
+        const botInfoEmbed = new EmbedBuilder()
+            .setColor('#3498db') // A nice blue color
+            .setTitle('Bot Information')
+            .setThumbnail(interaction.client.user.displayAvatarURL())
+            .setDescription(`A comprehensive overview of ${interaction.client.user.username}.`)
+            .addFields(
+                { name: 'Uptime', value: uptimeString, inline: true },
+                { name: 'Server Count', value: `${interaction.client.guilds.cache.size}`, inline: true },
+                { name: 'User Count', value: `${interaction.client.users.cache.size}`, inline: true },
+                { name: 'Ping', value: `${interaction.client.ws.ping}ms`, inline: true },
+                { name: 'Total Commands', value: `${interaction.client.commands.size}`, inline: true },
+                { name: 'Version', value: '1.2.0', inline: true }
+                // Removed all hardware-related fields (CPU, RAM, etc.) as requested
+            )
+            .setFooter({ text: `Requested by ${interaction.user.tag}` })
+            .setTimestamp();
 
-        // ====================================================================
-        //                       Stats Section
-        // ====================================================================
-        const statsFields = [
-            { name: '**- Stats**', value: '\u200b', inline: false },
-            {
-                name: '\u200b',
-                value: `• Guilds: \`${client.guilds.cache.size}\`\n` +
-                       `• Channels: \`${client.channels.cache.size}\`\n` +
-                       `• Members: \`${client.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0)}\`\n` +
-                       `• Created: <t:${Math.floor(client.user.createdAt.getTime() / 1000)}:R>`,
-                inline: false
-            }
-        ];
-
-        // ====================================================================
-        //                       Footer Section
-        // ====================================================================
-        const footerFields = [
-            { name: '\u200b', value: '\u200b', inline: false },
-            { name: '**- Powered by mlvs.me**', value: '\u200b', inline: false }
-        ];
-
-        // Combine and add all fields to the embed
-        botInfoEmbed.addFields(...softwareFields, ...hardwareFields, ...systemFields, ...statsFields, ...footerFields);
-
-        // Reply with the final embed
+        // Send the embed as the reply
         await interaction.editReply({ embeds: [botInfoEmbed] });
     },
 };

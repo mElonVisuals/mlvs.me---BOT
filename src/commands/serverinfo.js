@@ -6,6 +6,9 @@
 const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
 
 module.exports = {
+    // Add a category property for organization
+    category: 'Information',
+
     // Command data
     data: new SlashCommandBuilder()
         .setName('serverinfo')
@@ -17,6 +20,7 @@ module.exports = {
         await interaction.deferReply();
 
         const guild = interaction.guild;
+        const owner = await guild.fetchOwner();
 
         // Get server statistics
         const totalMembers = guild.memberCount;
@@ -27,7 +31,6 @@ module.exports = {
         const textChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildText).size;
         const voiceChannels = guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).size;
         const categories = guild.channels.cache.filter(c => c.type === ChannelType.GuildCategory).size;
-        const totalChannels = guild.channels.cache.size;
 
         // Get role count (excluding @everyone)
         const roleCount = guild.roles.cache.size - 1;
@@ -36,16 +39,13 @@ module.exports = {
         const boostLevel = guild.premiumTier;
         const boostCount = guild.premiumSubscriptionCount || 0;
 
-        // Get creation date
-        const createdAt = guild.createdAt;
-
         // Mappings for readability
         const verificationLevels = ['None', 'Low', 'Medium', 'High', 'Highest'];
         const contentFilterLevels = ['Off', 'No Role', 'All Members'];
 
         // Create the new embed
         const serverInfoEmbed = new EmbedBuilder()
-            // Set the color, title, thumbnail, and footer to match the requested style
+            // Set the color, title, thumbnail, and footer to match your requested style
             .setColor(0x2b2d31) // A dark, Discord-like gray
             .setTitle(`Server Info - ${guild.name}`)
             .setThumbnail(guild.iconURL({ dynamic: true, size: 1024 }))
@@ -55,64 +55,45 @@ module.exports = {
                 iconURL: guild.iconURL()
             });
 
-        // ====================================================================
-        //                       General Section
-        // ====================================================================
-        const generalFields = [
-            // Section header
-            { name: '**__- General:__**', value: '\u200b', inline: false },
+        // Add fields for General Info
+        serverInfoEmbed.addFields(
+            { name: '**__- General:__**', value: ` `, inline: false },
             { name: 'Server ID:', value: `🆔 \`${guild.id}\``, inline: true },
-            { name: 'Owner:', value: `👑 <@${guild.ownerId}>`, inline: true },
-            { name: '\u200b', value: '\u200b', inline: true }, // Spacer
-            {
-                name: 'Created At:',
-                value: `🗓️ <t:${Math.floor(createdAt.getTime() / 1000)}:R>`,
-                inline: true
-            },
-            {
-                name: 'Members:',
-                value: `👥 ${totalMembers}`,
-                inline: true
-            },
-            { name: '\u200b', value: '\u200b', inline: true }, // Spacer
-        ];
+            { name: 'Owner:', value: `👑 <@${owner.id}>`, inline: true },
+            { name: 'Created At:', value: `🗓️ <t:${Math.floor(guild.createdAt.getTime() / 1000)}:R>`, inline: true }
+        );
 
-        // ====================================================================
-        //                       Statistics Section
-        // ====================================================================
-        const statisticsFields = [
-            // Section header
-            { name: '\u200b', value: '\u200b', inline: false }, // Spacer
-            { name: '**__- Statistics:__**', value: '\u200b', inline: false },
-            {
-                name: 'Counts:',
-                value: `**Text Channels:** ${textChannels}\n` +
-                       `**Voice Channels:** ${voiceChannels}\n` +
-                       `**Roles:** ${roleCount}\n` +
-                       `**Categories:** ${categories}`,
-                inline: true
+        // Add fields for Statistics
+        serverInfoEmbed.addFields(
+            { name: '\u200b', value: '\u200b', inline: false }, // Adds a clean line break
+            { name: '**__- Statistics:__**', value: ` `, inline: false },
+            { 
+                name: 'Channels:', 
+                value: `• Text: ${textChannels}\n• Voice: ${voiceChannels}\n• Categories: ${categories}`, 
+                inline: true 
+            },
+            { 
+                name: 'Members:', 
+                value: `• Total: ${totalMembers}\n• Humans: ${humanCount}\n• Bots: ${botCount}`, 
+                inline: true 
+            },
+            { 
+                name: 'Roles:', 
+                value: `• Total: ${roleCount}`, 
+                inline: true 
             },
             {
                 name: 'Server Boosts:',
-                value: `⭐ **Level:** ${boostLevel}\n` +
-                       `**Count:** ${boostCount}`,
+                value: `• Level: ${boostLevel}\n• Count: ${boostCount}`,
                 inline: true
             },
-            { name: '\u200b', value: '\u200b', inline: true }, // Spacer
             {
                 name: 'Security:',
-                value: `🛡️ **Verification:** ${verificationLevels[guild.verificationLevel]}\n` +
-                       `**Content Filter:** ${contentFilterLevels[guild.explicitContentFilter]}`,
+                value: `• Verification: ${verificationLevels[guild.verificationLevel]}\n• Content Filter: ${contentFilterLevels[guild.explicitContentFilter]}`,
                 inline: true
-            },
-            {
-                name: 'Members:',
-                value: `👥 **Humans:** ${humanCount}\n` +
-                       `**Bots:** ${botCount}`,
-                inline: true
-            },
-        ];
-        
+            }
+        );
+
         // Add server banner as an image if it exists
         if (guild.banner) {
             serverInfoEmbed.setImage(guild.bannerURL({ dynamic: true, size: 1024 }));
@@ -124,9 +105,8 @@ module.exports = {
                 feature.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
             ).join(', ');
             
-            // Add a field for server features
-            statisticsFields.push({
-                name: '\u200b', // Spacer to ensure new line
+            serverInfoEmbed.addFields({
+                name: '\u200b', // Adds a clean line break
                 value: '\u200b',
                 inline: false
             }, {
@@ -135,9 +115,6 @@ module.exports = {
                 inline: false
             });
         }
-
-        // Combine and add all fields to the embed
-        serverInfoEmbed.addFields(...generalFields, ...statisticsFields);
 
         // Reply with the final embed
         await interaction.editReply({ embeds: [serverInfoEmbed] });

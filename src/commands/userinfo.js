@@ -6,6 +6,9 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
+    // Add a category property for organization
+    category: 'Information',
+
     // Command data
     data: new SlashCommandBuilder()
         .setName('userinfo')
@@ -26,10 +29,10 @@ module.exports = {
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const targetMember = interaction.guild.members.cache.get(targetUser.id);
 
-        // Fetch the full user to get flags/badges
+        // Fetch the full user to get flags/badges and banner
         let fullUser = targetUser;
         try {
-            // Force fetch with cache bypass to get all user data including flags
+            // Force fetch with cache bypass to get all user data including flags and banner
             fullUser = await interaction.client.users.fetch(targetUser.id, { force: true, cache: false });
         } catch (error) {
             console.error('Could not fetch full user data:', error.message);
@@ -37,26 +40,60 @@ module.exports = {
 
         // Create the new embed
         const userInfoEmbed = new EmbedBuilder()
-            // Set the color and title to match the requested style
+            // Set the color, title, and thumbnail
             .setColor(0x2b2d31) // A dark, Discord-like gray
             .setTitle(`User Info - ${fullUser.username}`)
-            // Set the thumbnail to the user's avatar
             .setThumbnail(fullUser.displayAvatarURL({ dynamic: true, size: 1024 }))
             // Add a timestamp and footer
             .setTimestamp()
             .setFooter({
-                text: `${interaction.guild.name}`, // You can customize this
+                text: `${interaction.guild.name}`,
                 iconURL: interaction.guild.iconURL()
             });
 
         // ====================================================================
-        //                       General Section
+        //                       General Section
         // ====================================================================
+        // Add fields for General Info
+        userInfoEmbed.addFields(
+            { name: '**__- General:__**', value: '\u200b', inline: false },
+            { name: 'Username:', value: `${fullUser.username}`, inline: true },
+            { name: 'ID:', value: `\`${fullUser.id}\``, inline: true }
+        );
 
-        // Format user badges/flags
-        const badges = fullUser.flags?.toArray()
-            .map(flag => {
-                // Convert flag names to emojis for a cleaner look
+        // ====================================================================
+        //                       Server Stats Section
+        // ====================================================================
+        // Only show server stats if the user is in the guild
+        if (targetMember) {
+            // Get the highest role the user has
+            const highestRole = targetMember.roles.highest.id === interaction.guild.id ? 'None' : targetMember.roles.highest;
+            
+            userInfoEmbed.addFields(
+                { name: '\u200b', value: '\u200b', inline: false },
+                { name: '**__- Server Stats:__**', value: '\u200b', inline: false },
+                { name: 'Nickname:', value: `${targetMember.nickname || 'None'}`, inline: true },
+                { name: 'Joined Server:', value: `🗓️ <t:${Math.floor(targetMember.joinedAt.getTime() / 1000)}:R>`, inline: true },
+                { name: 'Highest Role:', value: `${highestRole}`, inline: true },
+                { name: 'Total Roles:', value: `${targetMember.roles.cache.size - 1}`, inline: true },
+                { name: 'Account Created:', value: `🗓️ <t:${Math.floor(fullUser.createdAt.getTime() / 1000)}:R>`, inline: true }
+            );
+        } else {
+            // If the user is not in the guild, just show account creation date
+            userInfoEmbed.addFields(
+                { name: '\u200b', value: '\u200b', inline: false },
+                { name: 'Account Created:', value: `🗓️ <t:${Math.floor(fullUser.createdAt.getTime() / 1000)}:R>`, inline: false }
+            );
+        }
+
+        // ====================================================================
+        //                       Badges Section
+        // ====================================================================
+        // Check if the user has any flags/badges
+        const rawBadges = fullUser.flags ? fullUser.flags.toArray() : [];
+        const badges = rawBadges.length > 0 ?
+            rawBadges.map(flag => {
+                // Map the flag names to official Discord badge emojis for a better look
                 switch (flag) {
                     case 'Staff': return 'Discord Staff';
                     case 'Partner': return 'Discord Partner';
@@ -67,45 +104,27 @@ module.exports = {
                     case 'HypeSquadOnlineHouse2': return 'HypeSquad Brilliance';
                     case 'HypeSquadOnlineHouse3': return 'HypeSquad Balance';
                     case 'PremiumEarlySupporter': return 'Early Supporter';
-                    case 'TeamPseudoUser': return 'Team User';
                     case 'VerifiedBot': return 'Verified Bot';
                     case 'VerifiedDeveloper': return 'Verified Developer';
                     case 'ActiveDeveloper': return 'Active Developer';
                     default: return flag;
                 }
-            })
-            .join(', ');
+            }).join(', ') :
+            'None';
 
-        const generalFields = [
-            // Section header
-            { name: '**__- General:__**', value: '\u200b', inline: false },
-            { name: 'Username:', value: `👑 ${fullUser.username}`, inline: true },
-            { name: 'ID:', value: `🆔 \`${fullUser.id}\``, inline: true },
-            { name: '\u200b', value: '\u200b', inline: true }, // Spacer
-            {
-                name: 'Account Created:',
-                value: `🗓️ <t:${Math.floor(fullUser.createdAt.getTime() / 1000)}:R>`,
-                inline: true
-            },
-        ];
-
-        // Add member-specific general info if available
-        if (targetMember) {
-            generalFields.push(
-                {
-                    name: 'Joined Server:',
-                    value: `🗓️ <t:${Math.floor(targetMember.joinedAt.getTime() / 1000)}:R>`,
-                    inline: true
-                },
-                { name: '\u200b', value: '\u200b', inline: true } // Spacer
-            );
-        }
-
-        // Add badges if the user has any
-        if (badges) {
-            generalFields.push({ name: 'Badges:', value: `🏆 ${badges}`, inline: false });
-        }
-
+        userInfoEmbed.addFields({
+            name: '\u200b', // Spacer for a new line
+            value: '\u200b',
+            inline: false
+        }, {
+            name: '🏆 Badges:',
+            value: badges,
+            inline: false
+        });
+        
+        // ====================================================================
+        //                       Roles Section
+        // ====================================================================
         // Add roles if the user has any in this guild
         if (targetMember && targetMember.roles.cache.size > 1) {
             const roles = targetMember.roles.cache
@@ -113,36 +132,17 @@ module.exports = {
                 .sort((a, b) => b.position - a.position)
                 .map(role => role.toString());
 
-            generalFields.push({
+            userInfoEmbed.addFields({
                 name: `Roles [${roles.length}]`,
-                value: roles.join(' '),
+                value: roles.join(', '),
                 inline: false
             });
         }
-
-        // ====================================================================
-        //                       Statistics Section
-        // ====================================================================
-        const statisticsFields = [
-            // Section header
-            { name: '\u200b', value: '\u200b', inline: false }, // Spacer
-            { name: '**__- Statistics:__**', value: '\u200b', inline: false },
-            { name: 'Is Bot?', value: targetUser.bot ? '🤖 Yes' : '👤 No', inline: true },
-        ];
-
-        // Add more stats if the user is in the guild
-        if (targetMember) {
-            const statusEmojis = { 'online': '🟢', 'idle': '🟡', 'dnd': '🔴', 'offline': '⚫' };
-            const status = targetMember.presence?.status || 'offline';
-            const statusText = status.charAt(0).toUpperCase() + status.slice(1);
-
-            statisticsFields.push(
-                { name: 'Status:', value: `${statusEmojis[status]} ${statusText}`, inline: true }
-            );
+        
+        // Add the user's banner as the image if it exists
+        if (fullUser.banner) {
+            userInfoEmbed.setImage(fullUser.bannerURL({ dynamic: true, size: 1024 }));
         }
-
-        // Combine and add all fields to the embed
-        userInfoEmbed.addFields(...generalFields, ...statisticsFields);
 
         // Reply with the final embed
         await interaction.editReply({ embeds: [userInfoEmbed] });
