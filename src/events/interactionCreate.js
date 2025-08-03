@@ -11,7 +11,7 @@ const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 const VERIFICATION_ROLE_ID = '1399901918481879212';
 
 // NEW: Replace this with the ID of the role you want to REMOVE from verified users.
-const UNVERIFIED_ROLE_ID = 'YOUR_UNVERIFIED_ROLE_ID_HERE';
+const UNVERIFIED_ROLE_ID = '1401625907482984551';
 
 module.exports = {
     name: Events.InteractionCreate,
