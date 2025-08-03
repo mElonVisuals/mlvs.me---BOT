@@ -1,6 +1,12 @@
-// src/commands/help.js
+/**
+ * @file help.js
+ * @description The slash command to display a dynamic list of all available commands,
+ * categorized and filtered based on the user's permissions.
+ */
 
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
+// Import the custom embed builder and theme for consistent styling
+const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
 
 module.exports = {
     category: 'Utility',
@@ -8,19 +14,26 @@ module.exports = {
         .setName('help')
         .setDescription('Display information about available commands'),
 
+    /**
+     * Executes the help command.
+     * @param {import('discord.js').ChatInputCommandInteraction} interaction The interaction object.
+     */
     async execute(interaction) {
         const { client } = interaction;
         
-        // Get your bot's owner ID from the main file or configuration
+        // IMPORTANT: Replace this with your bot's owner ID.
         const BOT_OWNER_ID = '952705075711729695';
         const isOwner = interaction.user.id === BOT_OWNER_ID;
 
-        // Create an object to store commands grouped by category
+        // Create a new instance of the CustomEmbedBuilder
+        const embedBuilder = new CustomEmbedBuilder(client);
+
+        // Create a Map to store commands grouped by category
         const categorizedCommands = new Map();
 
         // Iterate through all commands and group them
-        for (const [name, command] of client.commands) {
-            // Check permissions before adding to the list
+        for (const command of client.commands.values()) {
+            // By default, assume the user can view the command
             let canView = true;
 
             // Check if the command is for the owner only.
@@ -30,6 +43,7 @@ module.exports = {
 
             // Check for role-based permissions.
             if (canView && command.permissions && command.permissions.length > 0) {
+                // If the command has specific role permissions, check if the user has any of them.
                 const memberRoles = interaction.member.roles.cache;
                 const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
                 if (!hasPermission) {
@@ -47,9 +61,8 @@ module.exports = {
             }
         }
 
-        // Create the main help embed
-        const helpEmbed = new EmbedBuilder()
-            .setColor(0x5865F2)
+        // Create the main help embed using the custom builder
+        const helpEmbed = embedBuilder.createBaseEmbed('info')
             .setTitle(`🤖 ${client.user.username} Commands`)
             .setDescription('Here is a list of all available commands, organized by category.')
             .setThumbnail(client.user.displayAvatarURL());
@@ -77,14 +90,11 @@ module.exports = {
                 name: '🔗 Quick Links',
                 value: '[Support Server](https://discord.gg/wgpePdK8z9) • [Invite Bot](https://discord.com/api/oauth2/authorize?client_id=1393986208828489788&permissions=0&scope=bot%20applications.commands)',
                 inline: false
-            },
+            }
         );
 
-        helpEmbed.setFooter({
-            text: `Requested by ${interaction.user.tag}`,
-            iconURL: interaction.user.displayAvatarURL()
-        });
-
-        await interaction.reply({ embeds: [helpEmbed] });
+        // Use editReply() because the `interactionCreate` event handler
+        // has already deferred the reply.
+        await interaction.editReply({ embeds: [helpEmbed] });
     },
 };

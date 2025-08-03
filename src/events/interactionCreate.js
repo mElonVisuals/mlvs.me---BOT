@@ -1,7 +1,9 @@
 /**
- * Interaction Create Event Handler
- * Handles slash command interactions and button clicks for the verification system.
+ * @file interactionCreate.js
+ * @description This event handler listens for all slash command interactions and button clicks.
+ * It has been updated to properly defer all replies to avoid `Unknown interaction` errors.
  */
+
 const { Events } = require('discord.js');
 const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 
@@ -21,7 +23,8 @@ module.exports = {
             if (interaction.customId === 'verify-button') {
                 console.log(`[INFO] Verification button clicked by user: ${interaction.user.tag} (ID: ${interaction.user.id})`);
 
-                // Defer the update immediately to prevent a timeout error.
+                // Defer the button update immediately to prevent a timeout error.
+                // This makes the button unclickable and shows a loading state.
                 await interaction.deferUpdate();
 
                 const member = interaction.guild.members.cache.get(interaction.user.id);
@@ -30,6 +33,7 @@ module.exports = {
 
                 if (!member) {
                     console.error('[ERROR] Failed to find the member who clicked the verification button.');
+                    await interaction.followUp({ content: 'An internal error occurred: the member could not be found.', ephemeral: true });
                     return;
                 }
                 if (!roleToAdd) {
@@ -37,8 +41,9 @@ module.exports = {
                     await interaction.followUp({ content: 'An internal error occurred: the verification role could not be found. Please notify a server administrator.', ephemeral: true });
                     return;
                 }
+                // The UNVERIFIED_ROLE_ID check is a warning because it's optional
                 if (!roleToRemove) {
-                    console.error(`[WARN] Unverified role not found with ID: ${UNVERIFIED_ROLE_ID}. Skipping removal.`);
+                    console.warn(`[WARN] Unverified role not found with ID: ${UNVERIFIED_ROLE_ID}. Skipping removal.`);
                 }
 
                 if (member.roles.cache.has(VERIFICATION_ROLE_ID)) {
@@ -48,11 +53,13 @@ module.exports = {
                 }
 
                 try {
+                    // Remove the unverified role if it exists and a role was found
                     if (roleToRemove && member.roles.cache.has(UNVERIFIED_ROLE_ID)) {
                         await member.roles.remove(roleToRemove);
                         console.log(`[SUCCESS] Removed unverified role from ${interaction.user.tag}.`);
                     }
 
+                    // Add the verification role
                     await member.roles.add(roleToAdd);
                     console.log(`[SUCCESS] Added verification role to ${interaction.user.tag}.`);
 
@@ -61,11 +68,16 @@ module.exports = {
                         'You have been granted access to the server. Welcome!'
                     );
 
+                    // Use followUp() after deferUpdate() to send a new message.
                     await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
 
                 } catch (error) {
                     console.error(`[ERROR] Failed to modify roles for user ${interaction.user.tag}:`, error);
-                    await interaction.followUp({ content: 'An unexpected error occurred during verification. Please contact a server administrator for assistance.', ephemeral: true });
+                    const errorEmbed = new CustomEmbedBuilder(interaction.client).error(
+                        'Verification Error',
+                        'An unexpected error occurred during verification. Please contact a server administrator for assistance.'
+                    );
+                    await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
                 }
             }
             return;
@@ -92,8 +104,10 @@ module.exports = {
             // Defer the reply for all slash commands here.
             // This prevents the "Unknown interaction" error by acknowledging the command
             // within the 3-second API timeout. The bot now has up to 15 minutes to reply.
-            await interaction.deferReply();
+            await interaction.deferReply({ ephemeral: true });
 
+            // Now execute the command. The command's execute function must use `interaction.editReply()`
+            // to send its final response.
             await command.execute(interaction);
         } catch (error) {
             console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
@@ -106,8 +120,8 @@ module.exports = {
 
             // Use editReply() because the interaction has already been deferred.
             // This prevents the "Interaction has already been acknowledged" error.
-            if (interaction.replied || interaction.deferred) {
-                await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ embeds: [errorEmbed] });
             } else {
                 await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             }
