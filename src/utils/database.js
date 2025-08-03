@@ -1,88 +1,76 @@
 /**
- * Database Utility for MySQL
- * Handles connection and queries for guild settings.
+ * Database Utility
+ * Handles all MySQL connections and queries for the bot
  */
+
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 
-// Validate required environment variables for the database
-const requiredDbVars = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_DATABASE'];
-for (const envVar of requiredDbVars) {
-    if (!process.env[envVar]) {
-        console.error(`❌ Missing required environment variable: ${envVar}`);
-        process.exit(1);
-    }
-}
-console.log('✅ Database environment variables loaded successfully');
+let pool;
 
-let connection;
-
-/**
- * Initializes and tests the database connection.
- */
-async function initializeDatabase() {
+async function initDatabase() {
     try {
-        console.log('🔗 Connecting to MySQL database...');
-        connection = await mysql.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_DATABASE
+        // Create a connection pool to handle multiple connections
+        pool = mysql.createPool({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_DATABASE,
+            name: process.env.DB_NAME,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0
         });
-        console.log('✅ Successfully connected to the MySQL database!');
+
+        // Test the connection
+        await pool.getConnection();
+        console.log('✅ Successfully connected to MySQL database.');
+
+        // Create the reminders table if it doesn't exist
+        const createTableSql = `
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            userId VARCHAR(255) NOT NULL,
+            channelId VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            remindAt BIGINT NOT NULL
+        )
+        `;
+        await pool.execute(createTableSql);
+        console.log('✅ "reminders" table is ready.');
     } catch (error) {
-        console.error('❌ Failed to connect to MySQL database:', error);
-        process.exit(1);
+        console.error('❌ Failed to connect to MySQL or create table:', error);
+        process.exit(1); // Exit the process if the database connection fails
     }
 }
 
-/**
- * Retrieves a single setting for a guild from the database.
- * @param {string} guildId - The ID of the guild.
- * @param {string} settingKey - The key of the setting to retrieve (e.g., 'welcomeChannelId').
- * @returns {Promise<string|null>} The value of the setting, or null if not found.
- */
-async function getGuildSetting(guildId, settingKey) {
-    try {
-        if (!connection) {
-            await initializeDatabase();
-        }
-
-        const [rows] = await connection.execute(
-            'SELECT settingValue FROM guildSettings WHERE guildId = ? AND settingKey = ?',
-            [guildId, settingKey]
-        );
-        return rows.length > 0 ? rows[0].settingValue : null;
-    } catch (error) {
-        console.error(`❌ Error retrieving setting '${settingKey}' for guild ${guildId}:`, error);
-        return null;
-    }
+async function saveReminder(userId, channelId, message, remindAt) {
+    const sql = 'INSERT INTO reminders (userId, channelId, message, remindAt) VALUES (?, ?, ?, ?)';
+    await pool.execute(sql, [userId, channelId, message, remindAt]);
 }
 
-/**
- * Sets or updates a single setting for a guild in the database.
- * @param {string} guildId - The ID of the guild.
- * @param {string} settingKey - The key of the setting to set.
- * @param {string|null} settingValue - The value of the setting.
- */
-async function setGuildSetting(guildId, settingKey, settingValue) {
-    try {
-        if (!connection) {
-            await initializeDatabase();
-        }
+async function getPendingReminders() {
+    const now = Date.now();
+    const sql = 'SELECT * FROM reminders WHERE remindAt > ? ORDER BY remindAt ASC';
+    const [rows] = await pool.execute(sql, [now]);
+    return rows;
+}
 
-        await connection.execute(
-            'INSERT INTO guildSettings (guildId, settingKey, settingValue) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE settingValue = ?',
-            [guildId, settingKey, settingValue, settingValue]
-        );
-        console.log(`💾 Saved setting '${settingKey}' for guild ${guildId}.`);
-    } catch (error) {
-        console.error(`❌ Error saving setting '${settingKey}' for guild ${guildId}:`, error);
-        throw error;
-    }
+async function getRemindersForUser(userId) {
+    const sql = 'SELECT * FROM reminders WHERE userId = ? ORDER BY remindAt ASC';
+    const [rows] = await pool.execute(sql, [userId]);
+    return rows;
+}
+
+async function deleteReminder(id) {
+    const sql = 'DELETE FROM reminders WHERE id = ?';
+    await pool.execute(sql, [id]);
 }
 
 module.exports = {
-    initializeDatabase,
-    getGuildSetting,
-    setGuildSetting
+    initDatabase,
+    saveReminder,
+    getPendingReminders,
+    getRemindersForUser,
+    deleteReminder
 };

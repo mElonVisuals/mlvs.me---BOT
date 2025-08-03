@@ -1,12 +1,11 @@
 /**
  * Ready Event Handler
- * Fires when the bot successfully connects to Discord
+ * Fires when the bot successfully connects to Discord and loads persistent reminders
  */
 
 const { Events, ActivityType } = require('discord.js');
 const { deployCommands } = require('../utils/deploy-commands');
-const { query } = require('../utils/database');
-const ms = require('ms');
+const { initDatabase, getPendingReminders, deleteReminder } = require('../utils/database');
 const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 
 module.exports = {
@@ -30,67 +29,77 @@ module.exports = {
             type: ActivityType.Playing,
         });
 
-        // Deploy commands on startup (in development)
+        // Deploy commands on startup
         if (process.env.NODE_ENV === 'production') {
             console.log('Deploying global commands in production...');
-            await deployCommands(client.application.id); // Deploy globally for production
+            await deployCommands(client.application.id);
             console.log('Global commands deployed.');
         } else {
             console.log(`Deploying commands to development guild (${process.env.GUILD_ID})...`);
-            await deployCommands(client.application.id, process.env.GUILD_ID); // Deploy to specific guild for testing
-            console.log('Guild commands deployed.');
+            await deployCommands(client.application.id, process.env.GUILD_ID);
+            console.log('Development guild commands deployed.');
         }
-        
-        // Load and re-queue reminders from the database
+
+        // --- MySQL Database Initialization and Reminder Loading ---
         try {
-            const reminders = await query('SELECT * FROM reminders');
-            console.log(`🕒 Found ${reminders.length} pending reminder(s).`);
+            await initDatabase();
+            const reminders = await getPendingReminders();
+
+            console.log(`⏳ Found ${reminders.length} pending reminders to reschedule.`);
 
             for (const reminder of reminders) {
-                const timeRemaining = reminder.timestamp - Date.now();
-                if (timeRemaining > 0) {
+                const timeInMs = reminder.remindAt - Date.now();
+                const reminderId = reminder.id;
+
+                if (timeInMs > 0) {
                     setTimeout(async () => {
                         try {
-                            const user = await client.users.fetch(reminder.user_id);
-                            const channel = await client.channels.fetch(reminder.channel_id);
+                            const user = await client.users.fetch(reminder.userId);
+                            const channel = await client.channels.fetch(reminder.channelId);
 
                             if (user && channel) {
                                 const embedBuilder = new CustomEmbedBuilder(client);
                                 const reminderEmbed = embedBuilder.info(
                                     'Reminder!',
-                                    `Hey ${user}! You asked me to remind you about:`
+                                    `Hey ${user}! You asked to be reminded about:`
                                 ).addFields(
                                     { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
                                 );
-                                await channel.send({ content: `<@${reminder.user_id}>`, embeds: [reminderEmbed] });
 
-                                await query('DELETE FROM reminders WHERE id = ?', [reminder.id]);
+                                await channel.send({ content: `<@${user.id}>`, embeds: [reminderEmbed] });
                             }
+
+                            // Delete the reminder from the database after sending
+                            await deleteReminder(reminderId);
                         } catch (error) {
-                            console.error(`Error sending a persistent reminder:`, error);
+                            console.error(`❌ Error sending or deleting reminder ${reminderId}:`, error);
                         }
-                    }, timeRemaining);
+                    }, timeInMs);
                 } else {
-                    // If the time has already passed, send it immediately
-                    const user = await client.users.fetch(reminder.user_id);
-                    const channel = await client.channels.fetch(reminder.channel_id);
+                    // If a reminder is in the past (e.g. bot was offline), send it immediately
+                    try {
+                        const user = await client.users.fetch(reminder.userId);
+                        const channel = await client.channels.fetch(reminder.channelId);
+                        if (user && channel) {
+                            const embedBuilder = new CustomEmbedBuilder(client);
+                            const reminderEmbed = embedBuilder.info(
+                                'Reminder!',
+                                `Hey ${user}! I'm sending this reminder now because I was offline:`
+                            ).addFields(
+                                { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
+                            );
 
-                    if (user && channel) {
-                        const embedBuilder = new CustomEmbedBuilder(client);
-                        const reminderEmbed = embedBuilder.info(
-                            'Reminder!',
-                            `Hey ${user}! You asked me to remind you about:`
-                        ).addFields(
-                            { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
-                        );
-                        await channel.send({ content: `<@${reminder.user_id}>`, embeds: [reminderEmbed] });
-
-                        await query('DELETE FROM reminders WHERE id = ?', [reminder.id]);
+                            await channel.send({ content: `<@${user.id}>`, embeds: [reminderEmbed] });
+                        }
+                        // Delete the reminder from the database
+                        await deleteReminder(reminderId);
+                    } catch (error) {
+                        console.error(`❌ Error sending immediate reminder ${reminderId}:`, error);
                     }
                 }
             }
         } catch (error) {
-            console.error('❌ Error loading reminders on startup:', error);
+            console.error('❌ Error in ready.js during reminder loading:', error);
         }
     },
 };
