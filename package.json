@@ -1,13 +1,13 @@
 {
-  "name": "v2-discord-bot",
+  "name": "mlvs.me-v2",
   "version": "1.0.0",
-  "description": "A modern Discord bot using a v2 architecture.",
+  "description": "A bot for my private Discord server, reworked for V2.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "keywords": [],
-  "author": "Your Name",
+  "author": "mlvs.me",
   "license": "ISC",
   "dependencies": {
     "discord.js": "^14.15.3",
