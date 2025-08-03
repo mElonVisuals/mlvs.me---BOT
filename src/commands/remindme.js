@@ -1,8 +1,8 @@
 // src/commands/remindme.js
 const { SlashCommandBuilder } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
-const { saveReminder, checkReminderStatus } = require('../utils/database');
 const ms = require('ms');
+const { query } = require('../utils/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -30,41 +30,56 @@ module.exports = {
         if (!timeInMs || timeInMs < 5000) {
             const errorEmbed = embedBuilder.error(
                 'Invalid Time',
-                `Please provide a valid time greater than 5 seconds.`
+                'Please provide a valid time greater than 5 seconds. (e.g., 10s, 5m, 1h, 3d)'
             );
-            return await interaction.editReply({ embeds: [errorEmbed] });
+            return interaction.editReply({ embeds: [errorEmbed] });
         }
 
-        const reminderTimestamp = Date.now() + timeInMs;
+        const reminderTimestamp = Math.floor((Date.now() + timeInMs) / 1000);
 
         try {
-            // Save the reminder to the database
-            const reminder = {
-                userId,
-                channelId,
-                message: reminderMessage,
-                timestamp: reminderTimestamp
-            };
-            await saveReminder(userId, channelId, reminderMessage, reminderTimestamp);
+            // Store the reminder in the database
+            const sql = 'INSERT INTO reminders (user_id, channel_id, message, timestamp) VALUES (?, ?, ?, ?)';
+            await query(sql, [userId, channelId, reminderMessage, reminderTimestamp * 1000]);
 
-            // Schedule the reminder using the utility function
-            checkReminderStatus(interaction.client, reminder);
-
-            // Create and send a success embed
             const successEmbed = embedBuilder.success(
                 'Reminder Set!',
-                `I will remind you <t:${Math.floor(reminderTimestamp / 1000)}:R> in this channel.`
+                `I will remind you <t:${reminderTimestamp}:R> in this channel.`
             ).addFields(
                 { name: 'Your Reminder', value: `\`\`\`${reminderMessage}\`\`\`` }
             );
 
             await interaction.editReply({ embeds: [successEmbed] });
 
+            // Set the timeout for the reminder
+            setTimeout(async () => {
+                try {
+                    // Fetch the user and channel again to ensure they are still available
+                    const user = await interaction.client.users.fetch(userId);
+                    const channel = await interaction.client.channels.fetch(channelId);
+
+                    if (user && channel) {
+                        const reminderEmbed = embedBuilder.info(
+                            'Reminder!',
+                            `Hey ${user}! You asked me to remind you about:`
+                        ).addFields(
+                            { name: 'Your Message', value: `\`\`\`${reminderMessage}\`\`\`` }
+                        );
+                        await channel.send({ content: `<@${userId}>`, embeds: [reminderEmbed] });
+                        
+                        // Delete the reminder from the database after it's sent
+                        const deleteSql = 'DELETE FROM reminders WHERE user_id = ? AND channel_id = ? AND message = ? AND timestamp = ?';
+                        await query(deleteSql, [userId, channelId, reminderMessage, reminderTimestamp * 1000]);
+                    }
+                } catch (error) {
+                    console.error(`Error sending reminder to ${userId} in ${channelId}:`, error);
+                }
+            }, timeInMs);
         } catch (error) {
-            console.error('❌ Error saving reminder to database:', error);
+            console.error('❌ Error setting reminder:', error);
             const errorEmbed = embedBuilder.error(
                 'Reminder Failed',
-                `An error occurred while setting your reminder. Please try again later.`
+                'There was an error saving your reminder. Please try again later.'
             );
             await interaction.editReply({ embeds: [errorEmbed] });
         }

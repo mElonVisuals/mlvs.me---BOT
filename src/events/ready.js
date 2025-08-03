@@ -1,11 +1,13 @@
 /**
  * Ready Event Handler
- * Fires when the bot successfully connects to Discord and loads reminders from the database.
+ * Fires when the bot successfully connects to Discord
  */
 
 const { Events, ActivityType } = require('discord.js');
 const { deployCommands } = require('../utils/deploy-commands');
-const { connectToDatabase, getReminders, checkReminderStatus } = require('../utils/database');
+const { query } = require('../utils/database');
+const ms = require('ms');
+const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 
 module.exports = {
     name: Events.ClientReady,
@@ -28,35 +30,67 @@ module.exports = {
             type: ActivityType.Playing,
         });
 
+        // Deploy commands on startup (in development)
+        if (process.env.NODE_ENV === 'production') {
+            console.log('Deploying global commands in production...');
+            await deployCommands(client.application.id); // Deploy globally for production
+            console.log('Global commands deployed.');
+        } else {
+            console.log(`Deploying commands to development guild (${process.env.GUILD_ID})...`);
+            await deployCommands(client.application.id, process.env.GUILD_ID); // Deploy to specific guild for testing
+            console.log('Guild commands deployed.');
+        }
+        
+        // Load and re-queue reminders from the database
         try {
-            // Attempt to connect to the database
-            await connectToDatabase();
-            console.log('✅ Successfully connected to the database.');
+            const reminders = await query('SELECT * FROM reminders');
+            console.log(`🕒 Found ${reminders.length} pending reminder(s).`);
 
-            // Load and schedule reminders from the database on startup
-            const reminders = await getReminders();
-            if (reminders.length > 0) {
-                console.log(`⏳ Found ${reminders.length} pending reminders. Re-scheduling now...`);
-                for (const reminder of reminders) {
-                    checkReminderStatus(client, reminder);
+            for (const reminder of reminders) {
+                const timeRemaining = reminder.timestamp - Date.now();
+                if (timeRemaining > 0) {
+                    setTimeout(async () => {
+                        try {
+                            const user = await client.users.fetch(reminder.user_id);
+                            const channel = await client.channels.fetch(reminder.channel_id);
+
+                            if (user && channel) {
+                                const embedBuilder = new CustomEmbedBuilder(client);
+                                const reminderEmbed = embedBuilder.info(
+                                    'Reminder!',
+                                    `Hey ${user}! You asked me to remind you about:`
+                                ).addFields(
+                                    { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
+                                );
+                                await channel.send({ content: `<@${reminder.user_id}>`, embeds: [reminderEmbed] });
+
+                                await query('DELETE FROM reminders WHERE id = ?', [reminder.id]);
+                            }
+                        } catch (error) {
+                            console.error(`Error sending a persistent reminder:`, error);
+                        }
+                    }, timeRemaining);
+                } else {
+                    // If the time has already passed, send it immediately
+                    const user = await client.users.fetch(reminder.user_id);
+                    const channel = await client.channels.fetch(reminder.channel_id);
+
+                    if (user && channel) {
+                        const embedBuilder = new CustomEmbedBuilder(client);
+                        const reminderEmbed = embedBuilder.info(
+                            'Reminder!',
+                            `Hey ${user}! You asked me to remind you about:`
+                        ).addFields(
+                            { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
+                        );
+                        await channel.send({ content: `<@${reminder.user_id}>`, embeds: [reminderEmbed] });
+
+                        await query('DELETE FROM reminders WHERE id = ?', [reminder.id]);
+                    }
                 }
-            } else {
-                console.log('✅ No pending reminders found on startup.');
-            }
-
-            // Deploy commands on startup (in development)
-            if (process.env.NODE_ENV === 'production') {
-                console.log('Deploying global commands in production...');
-                await deployCommands(client.application.id); // Deploy globally for production
-                console.log('Global commands deployed.');
-            } else {
-                console.log(`Deploying commands to development guild (${process.env.GUILD_ID})...`);
-                await deployCommands(client.application.id, process.env.GUILD_ID);
-                console.log(`✅ Guild commands deployed to ${process.env.GUILD_ID}.`);
             }
         } catch (error) {
-            console.error('❌ An error occurred during startup:', error);
-            process.exit(1);
+            console.error('❌ Error loading reminders on startup:', error);
         }
     },
 };
