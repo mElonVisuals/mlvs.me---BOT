@@ -1,63 +1,75 @@
 /**
- * Database Connection Utility
- * Connects to a MongoDB database using the official driver.
+ * Database Utility
+ * Manages the connection to a MySQL database and handles table creation.
  */
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const mysql = require('mysql2/promise');
 
-// Store the client connection in a global variable for reuse
-let client;
+let pool;
 
-/**
- * Establishes a connection to the MongoDB database.
- * @async
- * @returns {Promise<void>}
- */
-async function connectToDatabase() {
-    // Check if a client is already connected
-    if (client && client.db) {
-        console.log('✅ Already connected to the database.');
-        return;
-    }
-
-    const uri = process.env.MONGO_URL;
-
-    // Create a MongoClient with a MongoClientOptions object to set the Stable API version
+async function initializeDatabase() {
     try {
-        client = new MongoClient(uri, {
-            serverApi: {
-                version: ServerApiVersion.v1,
-                strict: true,
-                deprecationErrors: true,
-            }
+        // Create a connection pool using environment variables
+        pool = mysql.createPool({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0
         });
 
-        // Connect the client to the server
-        await client.connect();
-        // Log a success message on successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("✅ Successfully connected to MongoDB!");
+        console.log('✅ MySQL connection pool created successfully.');
 
+        // Verify the connection and create tables
+        const connection = await pool.getConnection();
+        console.log('✅ Connected to MySQL database.');
+
+        // Create 'reminders' table if it doesn't exist
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS reminders (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                channel_id VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                timestamp BIGINT NOT NULL
+            );
+        `);
+        console.log('✅ Reminders table checked/created.');
+
+        // Create 'afk_users' table if it doesn't exist
+        await connection.execute(`
+            CREATE TABLE IF NOT EXISTS afk_users (
+                user_id VARCHAR(255) PRIMARY KEY,
+                message VARCHAR(255) NOT NULL,
+                timestamp BIGINT NOT NULL
+            );
+        `);
+        console.log('✅ AFK Users table checked/created.');
+
+        connection.release();
     } catch (error) {
-        console.error('❌ Failed to connect to MongoDB:', error);
-        // Rethrow the error to be caught by the main `initializeBot` function
-        throw error;
+        console.error('❌ Failed to connect to database or create tables:', error);
+        process.exit(1);
     }
 }
 
 /**
- * Gets the database instance.
- * @returns {object|null} The database instance or null if not connected.
+ * Executes a MySQL query using the connection pool.
+ * @param {string} sql The SQL query string.
+ * @param {Array} params The parameters for the query.
+ * @returns {Promise<Array>} The query results.
  */
-function getDatabase() {
-    if (!client) {
-        return null;
+async function query(sql, params) {
+    if (!pool) {
+        throw new Error('Database pool not initialized. Call initializeDatabase() first.');
     }
-    return client.db(); // You can specify a database name here, e.g., client.db("my-database")
+    const [rows] = await pool.execute(sql, params);
+    return rows;
 }
 
 module.exports = {
-    connectToDatabase,
-    getDatabase,
-    client,
+    initializeDatabase,
+    query
 };

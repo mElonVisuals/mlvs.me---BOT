@@ -7,7 +7,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { loadCommands } = require('./src/utils/commandLoader');
 const { loadEvents } = require('./src/utils/eventLoader');
-const { connectToDatabase } = require('./src/utils/database'); // Import the new database connection function
+const { initializeDatabase } = require('./src/utils/database');
 
 // Validate required environment variables
 if (!process.env.DISCORD_TOKEN) {
@@ -20,9 +20,9 @@ if (!process.env.CLIENT_ID) {
     process.exit(1);
 }
 
-// Ensure MONGO_URL is set before trying to connect
-if (!process.env.MONGO_URL) {
-    console.error('❌ MONGO_URL is not set in .env file');
+// Validate required database environment variables
+if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+    console.error('❌ One or more required database variables (DB_HOST, DB_USER, DB_PASSWORD, DB_NAME) are not set in .env file.');
     process.exit(1);
 }
 
@@ -46,15 +46,15 @@ async function initializeBot() {
     try {
         console.log('🚀 Starting mlvs.me bot...');
 
-        // Connect to the database before loading commands or events
-        await connectToDatabase();
-        
+        // Initialize the database connection
+        await initializeDatabase();
+
         // Load commands and events
         await loadCommands(client);
         await loadEvents(client);
-        
+
         console.log('🔐 Attempting to login to Discord...');
-        
+
         // Login to Discord
         await client.login(process.env.DISCORD_TOKEN);
     } catch (error) {
@@ -77,5 +77,5 @@ process.on('uncaughtException', error => {
     process.exit(1);
 });
 
-// Start the bot initialization process
+// Run the initialization function
 initializeBot();

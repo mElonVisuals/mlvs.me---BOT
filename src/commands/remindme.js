@@ -1,13 +1,10 @@
 // src/commands/remindme.js
-
 const { SlashCommandBuilder } = require('discord.js');
 const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
 const ms = require('ms');
+const { query } = require('../utils/database');
 
 module.exports = {
-    // Add a category property
-    category: 'General',
-
     data: new SlashCommandBuilder()
         .setName('remindme')
         .setDescription('Sets a reminder for yourself.')
@@ -21,7 +18,6 @@ module.exports = {
                 .setRequired(true)),
     async execute(interaction) {
         const embedBuilder = new CustomEmbedBuilder(interaction.client);
-
         await interaction.deferReply({ ephemeral: true });
 
         const timeString = interaction.options.getString('time');
@@ -34,41 +30,58 @@ module.exports = {
         if (!timeInMs || timeInMs < 5000) {
             const errorEmbed = embedBuilder.error(
                 'Invalid Time',
-                'Please provide a valid time greater than 5 seconds (e.g., `10s`, `5m`, `1h`).'
+                'Please provide a valid time greater than 5 seconds. (e.g., 10s, 5m, 1h, 3d)'
             );
-            await interaction.editReply({ embeds: [errorEmbed] });
-            return;
+            return interaction.editReply({ embeds: [errorEmbed] });
         }
 
         const reminderTimestamp = Math.floor((Date.now() + timeInMs) / 1000);
 
-        const successEmbed = embedBuilder.success(
-            'Reminder Set!',
-            `I will remind you <t:${reminderTimestamp}:R> in this channel.`
-        ).addFields(
-            { name: 'Your Reminder', value: `\`\`\`${reminderMessage}\`\`\`` }
-        );
+        try {
+            // Store the reminder in the database
+            const sql = 'INSERT INTO reminders (user_id, channel_id, message, timestamp) VALUES (?, ?, ?, ?)';
+            await query(sql, [userId, channelId, reminderMessage, reminderTimestamp * 1000]);
 
-        await interaction.editReply({ embeds: [successEmbed] });
+            const successEmbed = embedBuilder.success(
+                'Reminder Set!',
+                `I will remind you <t:${reminderTimestamp}:R> in this channel.`
+            ).addFields(
+                { name: 'Your Reminder', value: `\`\`\`${reminderMessage}\`\`\`` }
+            );
 
-        setTimeout(async () => {
-            try {
-                const user = await interaction.client.users.fetch(userId);
-                const channel = await interaction.client.channels.fetch(channelId);
+            await interaction.editReply({ embeds: [successEmbed] });
 
-                if (user && channel) {
-                    const reminderEmbed = embedBuilder.info(
-                        'Reminder!',
-                        `Hey ${user}! You asked me to remind you about:`
-                    ).addFields(
-                        { name: 'Your Message', value: `\`\`\`${reminderMessage}\`\`\`` }
-                    );
+            // Set the timeout for the reminder
+            setTimeout(async () => {
+                try {
+                    // Fetch the user and channel again to ensure they are still available
+                    const user = await interaction.client.users.fetch(userId);
+                    const channel = await interaction.client.channels.fetch(channelId);
 
-                    await channel.send({ content: `<@${userId}>`, embeds: [reminderEmbed] });
+                    if (user && channel) {
+                        const reminderEmbed = embedBuilder.info(
+                            'Reminder!',
+                            `Hey ${user}! You asked me to remind you about:`
+                        ).addFields(
+                            { name: 'Your Message', value: `\`\`\`${reminderMessage}\`\`\`` }
+                        );
+                        await channel.send({ content: `<@${userId}>`, embeds: [reminderEmbed] });
+                        
+                        // Delete the reminder from the database after it's sent
+                        const deleteSql = 'DELETE FROM reminders WHERE user_id = ? AND channel_id = ? AND message = ? AND timestamp = ?';
+                        await query(deleteSql, [userId, channelId, reminderMessage, reminderTimestamp * 1000]);
+                    }
+                } catch (error) {
+                    console.error(`Error sending reminder to ${userId} in ${channelId}:`, error);
                 }
-            } catch (error) {
-                console.error(`Error sending reminder to ${userId} in ${channelId}:`, error);
-            }
-        }, timeInMs);
+            }, timeInMs);
+        } catch (error) {
+            console.error('❌ Error setting reminder:', error);
+            const errorEmbed = embedBuilder.error(
+                'Reminder Failed',
+                'There was an error saving your reminder. Please try again later.'
+            );
+            await interaction.editReply({ embeds: [errorEmbed] });
+        }
     },
 };

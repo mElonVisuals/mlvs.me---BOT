@@ -5,6 +5,9 @@
 
 const { Events, ActivityType } = require('discord.js');
 const { deployCommands } = require('../utils/deploy-commands');
+const { query } = require('../utils/database');
+const ms = require('ms');
+const { CustomEmbedBuilder } = require('../utils/embedBuilder');
 
 module.exports = {
     name: Events.ClientReady,
@@ -34,10 +37,60 @@ module.exports = {
             console.log('Global commands deployed.');
         } else {
             console.log(`Deploying commands to development guild (${process.env.GUILD_ID})...`);
-            await deployCommands(client.application.id, process.env.GUILD_ID); // Deploy to test guild
-            console.log('Development guild commands deployed.');
+            await deployCommands(client.application.id, process.env.GUILD_ID); // Deploy to specific guild for testing
+            console.log('Guild commands deployed.');
         }
+        
+        // Load and re-queue reminders from the database
+        try {
+            const reminders = await query('SELECT * FROM reminders');
+            console.log(`🕒 Found ${reminders.length} pending reminder(s).`);
 
-        console.log('🎉 Bot is fully operational!');
+            for (const reminder of reminders) {
+                const timeRemaining = reminder.timestamp - Date.now();
+                if (timeRemaining > 0) {
+                    setTimeout(async () => {
+                        try {
+                            const user = await client.users.fetch(reminder.user_id);
+                            const channel = await client.channels.fetch(reminder.channel_id);
+
+                            if (user && channel) {
+                                const embedBuilder = new CustomEmbedBuilder(client);
+                                const reminderEmbed = embedBuilder.info(
+                                    'Reminder!',
+                                    `Hey ${user}! You asked me to remind you about:`
+                                ).addFields(
+                                    { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
+                                );
+                                await channel.send({ content: `<@${reminder.user_id}>`, embeds: [reminderEmbed] });
+
+                                await query('DELETE FROM reminders WHERE id = ?', [reminder.id]);
+                            }
+                        } catch (error) {
+                            console.error(`Error sending a persistent reminder:`, error);
+                        }
+                    }, timeRemaining);
+                } else {
+                    // If the time has already passed, send it immediately
+                    const user = await client.users.fetch(reminder.user_id);
+                    const channel = await client.channels.fetch(reminder.channel_id);
+
+                    if (user && channel) {
+                        const embedBuilder = new CustomEmbedBuilder(client);
+                        const reminderEmbed = embedBuilder.info(
+                            'Reminder!',
+                            `Hey ${user}! You asked me to remind you about:`
+                        ).addFields(
+                            { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
+                        );
+                        await channel.send({ content: `<@${reminder.user_id}>`, embeds: [reminderEmbed] });
+
+                        await query('DELETE FROM reminders WHERE id = ?', [reminder.id]);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error loading reminders on startup:', error);
+        }
     },
 };

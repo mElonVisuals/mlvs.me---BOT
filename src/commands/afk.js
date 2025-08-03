@@ -1,13 +1,11 @@
 /**
  * AFK Command
- * Set AFK status with custom message and auto-responses
+ * Set AFK status with custom message and auto-responses using a MySQL database.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
-const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
-
-// Store AFK users in memory (use database in production for persistence)
-const afkUsers = new Map();
+const { CustomEmbedBuilder } = require('../utils/embedBuilder');
+const { query } = require('../utils/database');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -26,111 +24,94 @@ module.exports = {
         const afkMessage = interaction.options.getString('message') || 'AFK';
         const userId = interaction.user.id;
 
-        // Check if user is already AFK
-        if (afkUsers.has(userId)) {
-            // Remove AFK status
-            const userData = afkUsers.get(userId);
-            afkUsers.delete(userId);
+        await interaction.deferReply({ ephemeral: true });
 
-            const returnEmbed = embedBuilder.success(
-                'Welcome Back!',
-                `You're no longer AFK. You were away for **${formatDuration(Date.now() - userData.timestamp)}**.`,
-                [
-                    {
-                        name: '📝 Previous AFK Message',
-                        value: userData.message,
-                        inline: false
-                    }
-                ]
+        try {
+            // Check if user is already AFK by querying the database
+            const existingAfk = await query('SELECT * FROM afk_users WHERE user_id = ?', [userId]);
+
+            if (existingAfk.length > 0) {
+                // If the user is already AFK, remove their status
+                await query('DELETE FROM afk_users WHERE user_id = ?', [userId]);
+
+                const userData = existingAfk[0];
+                const afkDuration = formatDuration(Date.now() - Number(userData.timestamp));
+
+                const returnEmbed = embedBuilder.success(
+                    'Welcome Back!',
+                    `You're no longer AFK. You were away for **${afkDuration}**.`
+                );
+                await interaction.editReply({ embeds: [returnEmbed] });
+            } else {
+                // Set AFK status in the database
+                const timestamp = Date.now();
+                await query('INSERT INTO afk_users (user_id, message, timestamp) VALUES (?, ?, ?)', [userId, afkMessage, timestamp]);
+
+                const setAfkEmbed = embedBuilder.info(
+                    'You are now AFK',
+                    `I will let people know you are AFK with the message: \`\`\`${afkMessage}\`\`\``
+                );
+                await interaction.editReply({ embeds: [setAfkEmbed] });
+            }
+        } catch (error) {
+            console.error('❌ Error handling AFK command:', error);
+            const errorEmbed = embedBuilder.error(
+                'AFK Command Failed',
+                'There was an error processing your request. Please try again later.'
             );
-
-            await interaction.reply({ embeds: [returnEmbed], ephemeral: true });
-        } else {
-            // Set AFK status
-            afkUsers.set(userId, {
-                message: afkMessage,
-                timestamp: Date.now(),
-                username: interaction.user.username
-            });
-
-            const afkEmbed = embedBuilder.info(
-                'AFK Status Set',
-                `You're now marked as AFK. I'll notify others when they mention you.`,
-                [
-                    {
-                        name: '💤 AFK Message',
-                        value: afkMessage,
-                        inline: false
-                    },
-                    {
-                        name: '🔔 How it works',
-                        value: 'When someone mentions you, I\'ll let them know you\'re AFK. Use `/afk` again to remove your AFK status.',
-                        inline: false
-                    }
-                ]
-            );
-
-            await interaction.reply({ embeds: [afkEmbed], ephemeral: true });
+            await interaction.editReply({ embeds: [errorEmbed] });
         }
     },
 
-    // Function to handle AFK mentions (called from message events)
-    handleMention(message, mentionedUser) {
-        if (afkUsers.has(mentionedUser.id)) {
-            const userData = afkUsers.get(mentionedUser.id);
-            const afkDuration = formatDuration(Date.now() - userData.timestamp);
-
-            const embedBuilder = new CustomEmbedBuilder(message.client);
-            const afkNotice = embedBuilder.warning(
-                `${mentionedUser.username} is AFK`,
-                `**Message:** ${userData.message}\n**Duration:** ${afkDuration}`,
-                [
-                    {
-                        name: '💡 Tip',
-                        value: 'They will be notified when they return and send a message.',
-                        inline: false
-                    }
-                ]
-            );
-
-            message.reply({ embeds: [afkNotice] }).catch(() => {
-                // Ignore errors if we can't reply (permissions, etc.)
-            });
+    // Function to check for AFK mentions (will be used in messageCreate.js)
+    async handleMention(message, mentionedUser) {
+        try {
+            const afkUser = await query('SELECT * FROM afk_users WHERE user_id = ?', [mentionedUser.id]);
+            if (afkUser.length > 0) {
+                const userData = afkUser[0];
+                const afkDuration = formatDuration(Date.now() - Number(userData.timestamp));
+                const embedBuilder = new CustomEmbedBuilder(message.client);
+                const afkNotice = embedBuilder.info(
+                    `User is AFK`,
+                    `\`\`\`${mentionedUser.username}\`\`\` has been AFK for **${afkDuration}** with the message: \`\`\`${userData.message}\`\`\``
+                );
+                message.reply({ embeds: [afkNotice] }).catch(() => {});
+            }
+        } catch (error) {
+            console.error('❌ Error handling AFK mention:', error);
         }
     },
 
     // Function to check if user returned from AFK
-    checkReturn(message) {
+    async checkReturn(message) {
         const userId = message.author.id;
-        if (afkUsers.has(userId)) {
-            const userData = afkUsers.get(userId);
-            const afkDuration = formatDuration(Date.now() - userData.timestamp);
-            afkUsers.delete(userId);
+        try {
+            const afkUser = await query('SELECT * FROM afk_users WHERE user_id = ?', [userId]);
+            if (afkUser.length > 0) {
+                await query('DELETE FROM afk_users WHERE user_id = ?', [userId]);
 
-            const embedBuilder = new CustomEmbedBuilder(message.client);
-            const returnEmbed = embedBuilder.success(
-                'Welcome Back!',
-                `You're no longer AFK after **${afkDuration}**.`
-            );
-
-            message.reply({ embeds: [returnEmbed] }).catch(() => {
-                // Ignore errors if we can't reply
-            });
+                const userData = afkUser[0];
+                const afkDuration = formatDuration(Date.now() - Number(userData.timestamp));
+                const embedBuilder = new CustomEmbedBuilder(message.client);
+                const returnEmbed = embedBuilder.success(
+                    'Welcome Back!',
+                    `You're no longer AFK after **${afkDuration}**.`
+                );
+                message.reply({ embeds: [returnEmbed] }).catch(() => {});
+            }
+        } catch (error) {
+            console.error('❌ Error checking for AFK return:', error);
         }
-    },
-
-    // Export the AFK users map for access from other files
-    getAfkUsers: () => afkUsers
+    }
 };
 
-// Helper function to format duration
 function formatDuration(ms) {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+    if (days > 0) return `${days}d ${hours % 24}h`;
     if (hours > 0) return `${hours}h ${minutes % 60}m`;
     if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
     return `${seconds}s`;
