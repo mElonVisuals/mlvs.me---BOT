@@ -1,134 +1,38 @@
 /**
- * Ready Event Handler
- * Fires when the bot successfully connects to Discord and loads persistent reminders
+ * ready.js
+ * This event fires once the bot successfully logs in.
+ * It registers the slash commands to a specific guild and logs a success message.
  */
 
-const { Events, ActivityType } = require('discord.js');
-const { deployCommands } = require('../utils/deploy-commands');
-const { initDatabase, getPendingReminders, deleteReminder } = require('../utils/database');
-const { CustomEmbedBuilder } = require('../utils/embedBuilder');
+const { Events } = require('discord.js');
 
 module.exports = {
-    name: Events.ClientReady,
-    once: true,
+    name: Events.ClientReady, // The event name to listen for
+    once: true, // This event should only run once
     async execute(client) {
-        console.log('');
-        console.log('╔═══════════════════════════════════════╗');
-        console.log('║           🤖 BOT READY! 🤖            ║');
-        console.log('╠═══════════════════════════════════════╣');
-        console.log(`║ Bot: ${client.user.tag.padEnd(30)} ║`);
-        console.log(`║ ID: ${client.user.id.padEnd(31)} ║`);
-        console.log(`║ Servers: ${client.guilds.cache.size.toString().padEnd(26)} ║`);
-        console.log(`║ Users: ${client.users.cache.size.toString().padEnd(28)} ║`);
-        console.log('╚═══════════════════════════════════════╝');
-        console.log('');
+        // Log a success message to the console.
+        console.log(`🚀 Ready! Logged in as ${client.user.tag}`);
 
-        // --- Configuration for Dynamic Rich Presence ---
-        // Define an array of rich presence activities.
-        // The status will cycle through this list.
-const activities = [
-    { name: 'your community flourish 📈', type: ActivityType.Watching },
-    { name: 'server performance metrics', type: ActivityType.Watching },
-    { name: 'for new commands | /help', type: ActivityType.Listening },
-    { name: 'a curated stream on Kick', type: ActivityType.Streaming, url: 'https://kick.com/trancefy' },
-    { name: 'server health and stability', type: ActivityType.Playing },
-];
-
-
-        let currentIndex = 0;
-
-        // Function to update the presence with the next activity
-        const updatePresence = () => {
-            const activity = activities[currentIndex];
-            client.user.setPresence({
-                activities: [activity],
-                status: 'dnd', // Can also be 'dnd', 'idle', or 'invisible'
-            });
-            
-            // Log the new presence to the console
-            console.log(`✨ Bot presence updated to: ${ActivityType[activity.type]} "${activity.name}"`);
-            
-            // Move to the next activity, looping back to the start if at the end of the array
-            currentIndex = (currentIndex + 1) % activities.length;
-        };
-
-        // Set the initial presence immediately
-        updatePresence();
-
-        // Use setInterval to change the presence at the specified interval (e.g., every 20 seconds)
-        setInterval(updatePresence, 20000);
-
-        // Deploy commands on startup
-        if (process.env.NODE_ENV === 'production') {
-            console.log('Deploying global commands in production...');
-            await deployCommands(client.application.id);
-            console.log('Global commands deployed.');
-        } else {
-            console.log(`Deploying commands to development guild (${process.env.GUILD_ID})...`);
-            await deployCommands(client.application.id, process.env.GUILD_ID);
-            console.log('Development guild commands deployed.');
+        // Since the bot is for a single server, we register commands to that guild.
+        // This is much faster than global registration.
+        const guildId = process.env.GUILD_ID; // Guild ID from your .env file
+        if (!guildId) {
+            console.error('❌ GUILD_ID is not defined in your .env file. Commands will not be registered.');
+            return;
         }
 
-        // --- MySQL Database Initialization and Reminder Loading ---
         try {
-            await initDatabase();
-            const reminders = await getPendingReminders();
+            // Get the specific guild object.
+            const guild = await client.guilds.fetch(guildId);
 
-            console.log(`⏳ Found ${reminders.length} pending reminders to reschedule.`);
+            // Transform the command collection into an array of command data.
+            const commandData = client.commands.map(cmd => cmd.data.toJSON());
 
-            for (const reminder of reminders) {
-                const timeInMs = reminder.remindAt - Date.now();
-                const reminderId = reminder.id;
-
-                if (timeInMs > 0) {
-                    setTimeout(async () => {
-                        try {
-                            const user = await client.users.fetch(reminder.userId);
-                            const channel = await client.channels.fetch(reminder.channelId);
-
-                            if (user && channel) {
-                                const embedBuilder = new CustomEmbedBuilder(client);
-                                const reminderEmbed = embedBuilder.info(
-                                    'Reminder!',
-                                    `Hey ${user}! You asked to be reminded about:`
-                                ).addFields(
-                                    { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
-                                );
-
-                                await channel.send({ content: `<@${user.id}>`, embeds: [reminderEmbed] });
-                            }
-
-                            // Delete the reminder from the database after sending
-                            await deleteReminder(reminderId);
-                        } catch (error) {
-                            console.error(`❌ Error sending or deleting reminder ${reminderId}:`, error);
-                        }
-                    }, timeInMs);
-                } else {
-                    // If a reminder is in the past (e.g. bot was offline), send it immediately
-                    try {
-                        const user = await client.users.fetch(reminder.userId);
-                        const channel = await client.channels.fetch(reminder.channelId);
-                        if (user && channel) {
-                            const embedBuilder = new CustomEmbedBuilder(client);
-                            const reminderEmbed = embedBuilder.info(
-                                'Reminder!',
-                                `Hey ${user}! I'm sending this reminder now because I was offline:`
-                            ).addFields(
-                                { name: 'Your Message', value: `\`\`\`${reminder.message}\`\`\`` }
-                            );
-
-                            await channel.send({ content: `<@${user.id}>`, embeds: [reminderEmbed] });
-                        }
-                        // Delete the reminder from the database
-                        await deleteReminder(reminderId);
-                    } catch (error) {
-                        console.error(`❌ Error sending immediate reminder ${reminderId}:`, error);
-                    }
-                }
-            }
+            // Set the commands for the guild.
+            await guild.commands.set(commandData);
+            console.log(`✅ Successfully registered ${commandData.length} slash commands to guild ID: ${guildId}`);
         } catch (error) {
-            console.error('❌ Error in ready.js during reminder loading:', error);
+            console.error('❌ Failed to register slash commands:', error);
         }
     },
 };

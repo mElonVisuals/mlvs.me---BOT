@@ -1,117 +1,63 @@
 /**
- * @file help.js
- * @description The slash command to display a dynamic list of all available commands,
- * categorized and filtered based on the user's permissions.
- *
- * This version has been corrected to properly defer the interaction, preventing
- * the "Unknown interaction" error that occurs when command execution takes longer
- * than the 3-second API timeout.
+ * This command file provides a dynamic help menu.
+ * It automatically reads all loaded commands and displays them in a user-friendly embed.
+ * Commands are filtered based on the user's permissions, ensuring they only see what they can use.
  */
 
-const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-// Import the custom embed builder and theme for consistent styling
-const { CustomEmbedBuilder, THEME } = require('../utils/embedBuilder');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
-    category: 'Utility',
+    // The command data defines the name and description of the slash command.
     data: new SlashCommandBuilder()
         .setName('help')
-        .setDescription('Display information about available commands'),
+        .setDescription('Displays a list of all available commands.'),
 
-    /**
-     * Executes the help command.
-     * @param {import('discord.js').ChatInputCommandInteraction} interaction The interaction object.
-     */
+    // The execute function contains the core logic for the command.
     async execute(interaction) {
-        // Check if interaction is already handled and use proper flags
-        if (!interaction.deferred && !interaction.replied) {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        }
-        
+        // Defer the reply to give the bot time to process and build the help embed.
+        await interaction.deferReply({ ephemeral: true });
+
+        // Access the client object to get the commands collection.
         const { client } = interaction;
-        
-        // IMPORTANT: Replace this with your bot's owner ID.
-        const BOT_OWNER_ID = '952705075711729695';
-        const isOwner = interaction.user.id === BOT_OWNER_ID;
+        const commands = client.commands;
 
-        // Create a new instance of the CustomEmbedBuilder
-        const embedBuilder = new CustomEmbedBuilder(client);
-
-        // Create a Map to store commands grouped by category
-        const categorizedCommands = new Map();
-
-        // Iterate through all commands and group them
-        for (const command of client.commands.values()) {
-            // By default, assume the user can view the command
-            let canView = true;
-
-            // Check if the command is for the owner only.
-            if (command.ownerOnly && !isOwner) {
-                canView = false;
+        // Filter the commands to only show those the user has permission to use.
+        const availableCommands = commands.filter(command => {
+            // Check for owner-only commands. BOT_OWNER_ID should be in your .env file.
+            if (command.ownerOnly && interaction.user.id !== process.env.BOT_OWNER_ID) {
+                return false;
             }
-
-            // Check for role-based permissions.
-            if (canView && command.permissions && command.permissions.length > 0) {
-                // If the command has specific role permissions, check if the user has any of them.
+            
+            // Check for commands that require specific roles.
+            if (command.permissions && command.permissions.length > 0) {
                 const memberRoles = interaction.member?.roles?.cache;
-                if (memberRoles) {
-                    const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
-                    if (!hasPermission) {
-                        canView = false;
-                    }
-                } else {
-                    // If we can't access member roles, deny access to permission-restricted commands
-                    canView = false;
+                // If the user doesn't have any roles or doesn't have a required role, they can't use the command.
+                if (!memberRoles || !command.permissions.some(roleId => memberRoles.has(roleId))) {
+                    return false;
                 }
             }
+            
+            return true;
+        });
 
-            // Only add commands the user can see
-            if (canView) {
-                const category = command.category || 'Uncategorized';
-                if (!categorizedCommands.has(category)) {
-                    categorizedCommands.set(category, []);
-                }
-                categorizedCommands.get(category).push(command);
-            }
-        }
+        // Format the command list for the embed's field.
+        const commandList = availableCommands.map(cmd => {
+            // Use the data.name and data.description properties from the command's SlashCommandBuilder.
+            return `\`/${cmd.data.name}\` - ${cmd.data.description}`;
+        }).join('\n');
 
-        // Create the main help embed using the custom builder
-        const helpEmbed = embedBuilder.createBaseEmbed('info')
-            .setTitle(`🤖 ${client.user.username} Commands`)
-            .setDescription('Here is a list of all available commands, organized by category.')
-            .setThumbnail(client.user.displayAvatarURL());
+        // Create and customize the help embed.
+        const helpEmbed = new EmbedBuilder()
+            .setColor(0x0099ff)
+            .setTitle('Bot Commands')
+            .setDescription('Here is a list of all the commands you can use.')
+            .addFields(
+                { name: 'Available Commands', value: commandList || 'No commands available.' }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Reworked for V2 by mlvs.me' });
 
-        // Add a field for each category
-        if (categorizedCommands.size > 0) {
-            for (const [category, commands] of categorizedCommands) {
-                const commandList = commands
-                    .map(cmd => `\`/${cmd.data.name}\` - ${cmd.data.description}`)
-                    .join('\n');
-    
-                helpEmbed.addFields({
-                    name: `__${category}__`,
-                    value: commandList,
-                    inline: false
-                });
-            }
-        } else {
-            helpEmbed.setDescription('You do not have access to any commands.');
-        }
-
-        // Add quick links and a footer
-        helpEmbed.addFields(
-            {
-                name: '🔗 Quick Links',
-                value: '[Support Server](https://discord.gg/wgpePdK8z9) • [Invite Bot](https://discord.com/api/oauth2/authorize?client_id=1393986208828489788&permissions=0&scope=bot%20applications.commands)',
-                inline: false
-            }
-        );
-
-        // Use editReply() after deferring the interaction
-        if (interaction.deferred) {
-            await interaction.editReply({ embeds: [helpEmbed] });
-        } else if (!interaction.replied) {
-            await interaction.reply({ embeds: [helpEmbed], flags: MessageFlags.Ephemeral });
-        }
+        // Edit the deferred reply with the complete help embed.
+        await interaction.editReply({ embeds: [helpEmbed] });
     },
 };

@@ -1,13 +1,14 @@
 /**
- * This is the final, updated index.js file for a single-server bot.
- * It removes all command deployment logic, which is now handled by deploy-commands.js.
+ * This is the main entry point for the bot.
+ * It handles the initialization of the Discord client, loads commands and events,
+ * and logs the bot in using the token from the .env file.
  */
 
 // Load environment variables from .env file
 require('dotenv').config();
 
 // Import necessary classes from the discord.js library
-const { Client, Collection, GatewayIntentBits, EmbedBuilder, MessageFlags } = require('discord.js');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
 
 // Import utility functions for loading commands and events, and for database connection
 const { loadCommands } = require('./src/utils/commandLoader');
@@ -18,86 +19,32 @@ const { initDatabase } = require('./src/utils/database');
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers, // For welcome/goodbye messages
+        GatewayIntentBits.GuildMembers, // For member-related events (e.g., welcome messages)
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent, // Required for message content (e.g., AFK)
+        GatewayIntentBits.MessageContent, // Required for message content and certain message-based commands
     ],
 });
 
-// Create a collection to store commands
+// Create a collection to store commands and make it accessible from the client object
 client.commands = new Collection();
 
+/**
+ * Initializes the bot by loading all commands, events, and connecting to the database.
+ */
 async function initializeBot() {
     try {
         console.log('✅ Environment variables loaded successfully');
         console.log('🚀 Starting mlvs.me bot...');
 
-        // Load commands and events from their respective directories
+        // Load commands from the 'src/commands' directory
         await loadCommands(client);
+
+        // Load events from the 'src/events' directory. The interactionCreate event
+        // handler will now be in its own file.
         await loadEvents(client);
 
-        // Initialize the database connection and check the "reminders" table
+        // Initialize the database connection
         await initDatabase();
-
-        // Define the bot owner's ID for owner-only commands
-        const BOT_OWNER_ID = '952705075711729695';
-
-        // --- INTERACTION HANDLER ---
-        client.on('interactionCreate', async interaction => {
-            if (!interaction.isChatInputCommand()) return;
-
-            // Get the command from the client's command collection
-            const command = interaction.client.commands.get(interaction.commandName);
-
-            if (!command) {
-                console.error(`No command matching ${interaction.commandName} was found.`);
-                return;
-            }
-
-            console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.username}`);
-
-            try {
-                // Pre-execution permission checks
-                if (command.ownerOnly && interaction.user.id !== BOT_OWNER_ID) {
-                    const forbiddenEmbed = new EmbedBuilder()
-                        .setColor(0xFEE75C)
-                        .setTitle('Permission Denied')
-                        .setDescription('This command is only available to the bot owner.')
-                        .setTimestamp();
-                    return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
-                }
-
-                if (command.permissions && command.permissions.length > 0) {
-                    const memberRoles = interaction.member?.roles?.cache;
-                    if (!memberRoles || !command.permissions.some(roleId => memberRoles.has(roleId))) {
-                        const forbiddenEmbed = new EmbedBuilder()
-                            .setColor(0xFEE75C)
-                            .setTitle('Permission Denied')
-                            .setDescription('You do not have the required role to use this command.')
-                            .setTimestamp();
-                        return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
-                    }
-                }
-
-                await interaction.deferReply({ ephemeral: true });
-                await command.execute(interaction);
-
-            } catch (error) {
-                console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
-
-                if (interaction.deferred) {
-                    await interaction.editReply({
-                        content: 'There was an error while executing this command!',
-                        ephemeral: true
-                    }).catch(err => console.error('Failed to send error follow-up:', err));
-                } else {
-                    await interaction.reply({
-                        content: 'There was an error while executing this command!',
-                        ephemeral: true
-                    }).catch(err => console.error('Failed to send error reply:', err));
-                }
-            }
-        });
 
         // Log in to Discord using the bot token from environment variables
         await client.login(process.env.DISCORD_TOKEN);
@@ -110,15 +57,14 @@ async function initializeBot() {
     }
 }
 
-// Call the initialization function to start the bot
+// Start the bot
 initializeBot();
 
-// Handle unhandled promise rejections to prevent the bot from crashing
+// Global error handlers to prevent the bot from crashing on unhandled errors.
 process.on('unhandledRejection', error => {
     console.error('Unhandled promise rejection:', error);
 });
 
-// Handle graceful shutdown signals to ensure a clean exit
 process.on('SIGTERM', () => {
     console.log('SIGTERM received. Shutting down gracefully.');
     client.destroy();
