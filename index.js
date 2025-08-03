@@ -42,7 +42,8 @@ async function initializeBot() {
         // Define the bot owner's ID for owner-only commands
         const BOT_OWNER_ID = '952705075711729695';
 
-        // Event listener for slash command interactions
+        // --- NEW AND IMPROVED INTERACTION HANDLER ---
+        // This handler now correctly defers replies to prevent timeouts and handles errors more gracefully.
         client.on('interactionCreate', async interaction => {
             // Only process slash command interactions
             if (!interaction.isChatInputCommand()) return;
@@ -59,8 +60,8 @@ async function initializeBot() {
             console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.username}`);
 
             try {
-                // --- PRE-EXECUTION PERMISSION CHECKS (before deferring) ---
-                // These checks happen BEFORE the command tries to defer, preventing conflicts
+                // --- PRE-EXECUTION PERMISSION CHECKS ---
+                // These checks happen BEFORE we defer. This is more efficient.
 
                 // Check if the command is for the owner only
                 if (command.ownerOnly && interaction.user.id !== BOT_OWNER_ID) {
@@ -72,20 +73,10 @@ async function initializeBot() {
                     return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
                 }
 
-                // Check for role-based permissions if defined in the command file
+                // Check for role-based permissions
                 if (command.permissions && command.permissions.length > 0) {
                     const memberRoles = interaction.member?.roles?.cache;
-                    if (!memberRoles) {
-                        const forbiddenEmbed = new EmbedBuilder()
-                            .setColor(0xFEE75C)
-                            .setTitle('Permission Denied')
-                            .setDescription('Unable to verify your permissions. Please try again.')
-                            .setTimestamp();
-                        return await interaction.reply({ embeds: [forbiddenEmbed], flags: MessageFlags.Ephemeral });
-                    }
-
-                    const hasPermission = command.permissions.some(roleId => memberRoles.has(roleId));
-                    if (!hasPermission) {
+                    if (!memberRoles || !command.permissions.some(roleId => memberRoles.has(roleId))) {
                         const forbiddenEmbed = new EmbedBuilder()
                             .setColor(0xFEE75C)
                             .setTitle('Permission Denied')
@@ -95,44 +86,36 @@ async function initializeBot() {
                     }
                 }
 
-                // If all permission checks pass, execute the command
+                // 🚨 CRITICAL FIX: Defer the reply right here.
+                // This sends a "thinking..." message and buys the bot more time.
+                // The `ephemeral` flag makes the thinking message only visible to the user.
+                await interaction.deferReply({ ephemeral: true });
+
+                // If all checks pass, execute the command
+                // The command file will now use interaction.editReply() to send the final message.
                 await command.execute(interaction);
 
             } catch (error) {
                 console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
 
-                // Only attempt to respond if we haven't already responded
-                if (!interaction.replied && !interaction.deferred) {
-                    try {
-                        const errorEmbed = new EmbedBuilder()
-                            .setColor(0xED4245)
-                            .setTitle('An Error Occurred')
-                            .setDescription('There was an error while executing this command. Please try again later.')
-                            .setTimestamp();
-
-                        await interaction.reply({ 
-                            embeds: [errorEmbed], 
-                            flags: MessageFlags.Ephemeral 
-                        });
-                    } catch (replyError) {
-                        console.error(`[ERROR] Failed to send error response for ${interaction.commandName}:`, replyError);
-                        // Don't try to respond again - just log it
-                    }
-                } else if (interaction.deferred && !interaction.replied) {
-                    try {
-                        const errorEmbed = new EmbedBuilder()
-                            .setColor(0xED4245)
-                            .setTitle('An Error Occurred')
-                            .setDescription('There was an error while executing this command. Please try again later.')
-                            .setTimestamp();
-
-                        await interaction.editReply({ embeds: [errorEmbed] });
-                    } catch (editError) {
-                        console.error(`[ERROR] Failed to edit deferred response for ${interaction.commandName}:`, editError);
-                    }
+                // This check handles cases where a command failed BEFORE or AFTER it was deferred.
+                if (interaction.deferred) {
+                    // If the reply was deferred, we need to edit the deferred message.
+                    await interaction.editReply({
+                        content: 'There was an error while executing this command!',
+                        ephemeral: true
+                    }).catch(err => console.error('Failed to send error follow-up:', err));
+                } else {
+                    // If the reply was not deferred (e.g., an error happened during permission checks),
+                    // we can still send a regular reply.
+                    await interaction.reply({
+                        content: 'There was an error while executing this command!',
+                        ephemeral: true
+                    }).catch(err => console.error('Failed to send error reply:', err));
                 }
             }
         });
+        // --- END OF NEW INTERACTION HANDLER ---
 
         // Log in to Discord using the bot token from environment variables
         await client.login(process.env.DISCORD_TOKEN);
