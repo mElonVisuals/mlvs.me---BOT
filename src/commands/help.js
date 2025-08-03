@@ -2,6 +2,10 @@
  * @file help.js
  * @description The slash command to display a dynamic list of all available commands,
  * categorized and filtered based on the user's permissions.
+ *
+ * This version has been corrected to properly defer the interaction, preventing
+ * the "Unknown interaction" error that occurs when command execution takes longer
+ * than the 3-second API timeout.
  */
 
 const { SlashCommandBuilder } = require('discord.js');
@@ -19,6 +23,10 @@ module.exports = {
      * @param {import('discord.js').ChatInputCommandInteraction} interaction The interaction object.
      */
     async execute(interaction) {
+        // --- FIX: Defer the reply immediately to prevent a timeout error. ---
+        // This acknowledges the interaction within the 3-second limit, giving you up to 15 minutes to respond.
+        await interaction.deferReply({ ephemeral: true });
+        
         const { client } = interaction;
         
         // IMPORTANT: Replace this with your bot's owner ID.
@@ -93,8 +101,8 @@ module.exports = {
             }
         );
 
-        // Use editReply() because the `interactionCreate` event handler
-        // has already deferred the reply.
+        // --- FIX: Use editReply() after deferring the interaction. ---
+        // This sends the final embed to the channel, replacing the "Bot is thinking..." message.
         await interaction.editReply({ embeds: [helpEmbed] });
     },
 };
