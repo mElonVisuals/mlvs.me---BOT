@@ -1,74 +1,66 @@
 /**
- * mlvs.me Discord Bot
- * Main entry point for the bot application
+ * Main entry point for the Discord bot.
+ * Initializes the Discord client, loads commands and events, and connects to the database.
  */
 
-require('dotenv').config();
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+require('dotenv').config(); // Load environment variables
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const { loadCommands } = require('./src/utils/commandLoader');
 const { loadEvents } = require('./src/utils/eventLoader');
-const { initializeDatabase } = require('./src/utils/database'); // Import the new database utility
+const { initDatabase } = require('./src/utils/database'); // Import the correct function
 
-// Validate required environment variables
-if (!process.env.DISCORD_TOKEN) {
-    console.error('❌ DISCORD_TOKEN is not set in .env file');
-    process.exit(1);
-}
-
-if (!process.env.CLIENT_ID) {
-    console.error('❌ CLIENT_ID is not set in .env file');
-    process.exit(1);
-}
-
-console.log('✅ Environment variables loaded successfully');
-
-// Create a new client instance with necessary intents
+// Create a new Discord client instance
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers, // For welcome/goodbye messages
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ]
+        GatewayIntentBits.MessageContent, // Required for message content (e.g., AFK)
+    ],
 });
 
 // Create a collection to store commands
 client.commands = new Collection();
 
-// Initialize the bot
 async function initializeBot() {
     try {
+        console.log('✅ Environment variables loaded successfully');
         console.log('🚀 Starting mlvs.me bot...');
-        
+
         // Load commands and events
         await loadCommands(client);
         await loadEvents(client);
-        
-        // Initialize database connection
-        await initializeDatabase(); // Call the new database initialization function
 
-        console.log('🔐 Attempting to login to Discord...');
-        
-        // Login to Discord
+        // Initialize the database connection and table (this is the fix!)
+        await initDatabase(); // Correct function name
+
+        // Log in to Discord
         await client.login(process.env.DISCORD_TOKEN);
+        console.log('✨ Bot logged in successfully!');
+
     } catch (error) {
         console.error('❌ Failed to initialize bot:', error);
-        console.error('Stack trace:', error.stack);
-        process.exit(1);
+        console.error('Stack trace:', error); // Log the full stack trace for better debugging
+        process.exit(1); // Exit the process if initialization fails
     }
 }
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', error => {
-    console.error('❌ Unhandled promise rejection:', error);
-    console.error('Stack trace:', error.stack);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', error => {
-    console.error('❌ Uncaught exception:', error);
-    console.error('Stack trace:', error.stack);
-});
-
-// Start the bot
+// Call the initialization function
 initializeBot();
+
+// Handle graceful shutdown
+process.on('unhandledRejection', error => {
+    console.error('Unhandled promise rejection:', error);
+});
+
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully.');
+    client.destroy();
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received. Shutting down gracefully.');
+    client.destroy();
+    process.exit(0);
+});
