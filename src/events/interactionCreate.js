@@ -34,7 +34,7 @@ module.exports = {
                 }
                 if (!role) {
                     console.error(`❌ Could not find the role with ID: ${VERIFICATION_ROLE_ID}`);
-                    await interaction.followUp({ content: 'Error: The verification role could not be found. Please contact a staff member.', ephemeral: true });
+                    await interaction.followUp({ content: 'Error: The verification role could not be found. Please contact our staff team.', ephemeral: true });
                     return;
                 }
 
