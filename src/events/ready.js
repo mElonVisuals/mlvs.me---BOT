@@ -26,12 +26,14 @@ module.exports = {
         // --- Configuration for Dynamic Rich Presence ---
         // Define an array of rich presence activities.
         // The status will cycle through this list.
-        const activities = [
-            { name: 'your server grow 📈', type: ActivityType.Watching },
-            { name: 'with your code 🤖', type: ActivityType.Playing },
-            { name: `mlvs.me | /help`, type: ActivityType.Listening },
-            { name: 'some music to listen to.', type: ActivityType.Streaming, url: 'https://kick.com/trancefy' },
-        ];
+const activities = [
+    { name: 'your community flourish 📈', type: ActivityType.Watching },
+    { name: 'server performance metrics', type: ActivityType.Watching },
+    { name: 'for new commands | /help', type: ActivityType.Listening },
+    { name: 'a curated stream on Kick', type: ActivityType.Streaming, url: 'https://kick.com/trancefy' },
+    { name: 'server health and stability', type: ActivityType.Playing },
+];
+
 
         let currentIndex = 0;
 
@@ -40,7 +42,7 @@ module.exports = {
             const activity = activities[currentIndex];
             client.user.setPresence({
                 activities: [activity],
-                status: 'online', // Can also be 'dnd', 'idle', or 'invisible'
+                status: 'dnd', // Can also be 'dnd', 'idle', or 'invisible'
             });
             
             // Log the new presence to the console
