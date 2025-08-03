@@ -1,37 +1,63 @@
 /**
  * Database Connection Utility
- * Connects to a MongoDB database using the connection string from the .env file.
+ * Connects to a MongoDB database using the official driver.
  */
 
-// Import the MongoClient from the mongodb library
-const { MongoClient } = require('mongodb');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
-// Get the MONGO_URL from the environment variables
-const { MONGO_URL } = process.env;
-
-// Create a new MongoClient
-const client = new MongoClient(MONGO_URL);
+// Store the client connection in a global variable for reuse
+let client;
 
 /**
- * Connects to the MongoDB database.
- * @returns {Promise<MongoClient>} The connected MongoClient instance.
+ * Establishes a connection to the MongoDB database.
+ * @async
+ * @returns {Promise<void>}
  */
 async function connectToDatabase() {
+    // Check if a client is already connected
+    if (client && client.db) {
+        console.log('✅ Already connected to the database.');
+        return;
+    }
+
+    const uri = process.env.MONGO_URL;
+
+    // Create a MongoClient with a MongoClientOptions object to set the Stable API version
     try {
-        // Attempt to connect to the database
-        console.log('🔗 Attempting to connect to MongoDB...');
+        client = new MongoClient(uri, {
+            serverApi: {
+                version: ServerApiVersion.v1,
+                strict: true,
+                deprecationErrors: true,
+            }
+        });
+
+        // Connect the client to the server
         await client.connect();
-        console.log('✅ Successfully connected to MongoDB!');
-        return client;
+        // Log a success message on successful connection
+        await client.db("admin").command({ ping: 1 });
+        console.log("✅ Successfully connected to MongoDB!");
+
     } catch (error) {
         console.error('❌ Failed to connect to MongoDB:', error);
-        // Rethrow the error to stop the bot from starting if the connection fails
+        // Rethrow the error to be caught by the main `initializeBot` function
         throw error;
     }
 }
 
-// Export the client and the connection function
+/**
+ * Gets the database instance.
+ * @returns {object|null} The database instance or null if not connected.
+ */
+function getDatabase() {
+    if (!client) {
+        return null;
+    }
+    return client.db(); // You can specify a database name here, e.g., client.db("my-database")
+}
+
 module.exports = {
-    client,
     connectToDatabase,
+    getDatabase,
+    client,
 };
