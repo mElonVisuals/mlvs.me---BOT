@@ -56,12 +56,12 @@ module.exports = {
 
                     await member.roles.add(roleToAdd);
                     console.log(`[SUCCESS] Added verification role to ${interaction.user.tag}.`);
-                    
+
                     const successEmbed = new CustomEmbedBuilder(interaction.client).success(
                         'Verification Successful',
                         'You have been granted access to the server. Welcome!'
                     );
-                    
+
                     await interaction.followUp({ embeds: [successEmbed], ephemeral: true });
 
                 } catch (error) {
@@ -78,23 +78,23 @@ module.exports = {
         const command = interaction.client.commands.get(interaction.commandName);
         if (!command) {
             console.error(`[ERROR] Command not found: ${interaction.commandName}.`);
-            
             const embedBuilder = new CustomEmbedBuilder(interaction.client);
             const errorEmbed = embedBuilder.error(
                 'Command Not Found',
                 `The command \`/${interaction.commandName}\` does not exist or is not registered.`
             );
-
-            // The interaction hasn't been deferred, so we must use reply()
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             return;
         }
 
         try {
             console.log(`[INFO] Executing command: ${interaction.commandName} by user: ${interaction.user.tag}`);
-            
-            // The deferReply() call has been removed from here.
-            // Each command file must now handle its own deferral if needed.
+
+            // This is the CRITICAL change: Defer the reply for all slash commands here.
+            // This prevents the "Unknown interaction" error by acknowledging the command
+            // within the 3-second API timeout. The bot now has up to 15 minutes to reply.
+            await interaction.deferReply();
+
             await command.execute(interaction);
         } catch (error) {
             console.error(`[ERROR] An error occurred while executing command ${interaction.commandName}:`, error);
@@ -104,8 +104,9 @@ module.exports = {
                 'Command Execution Error',
                 'An unexpected error occurred while processing your command. Please try again later.'
             );
-            
-            // Check if the interaction has been replied to or deferred
+
+            // Use editReply() because the interaction has already been deferred.
+            // This prevents the "Interaction has already been acknowledged" error.
             if (interaction.replied || interaction.deferred) {
                 await interaction.editReply({ embeds: [errorEmbed], ephemeral: true });
             } else {
